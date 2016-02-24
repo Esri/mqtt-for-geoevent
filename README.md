@@ -1,6 +1,6 @@
 # mqtt-for-geoevent
 
-ArcGIS 10.3.x GeoEvent Extension for Server sample MQTT Inbound and Outbound transports for sending and receiving messages in the MQTT format.
+ArcGIS 10.4.x GeoEvent Extension for Server sample MQTT Inbound and Outbound transports for sending and receiving messages in the MQTT format.
 
 ![App](mqtt-for-geoevent.png?raw=true)
 

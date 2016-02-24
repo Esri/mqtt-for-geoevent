@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.esri.geoevent.parent</groupId>
 		<artifactId>mqtt</artifactId>
-		<version>10.3.0</version>
+		<version>10.4.0</version>
 	</parent>
 
 	<groupId>com.esri.geoevent.transport</groupId>
@@ -40,6 +40,9 @@
 						<Bundle-ContactAddress>${contact.address}</Bundle-ContactAddress>
 						<Bundle-Version>${project.version}</Bundle-Version>
 						<Export-Package/>
+						<Embed-Dependency>
+							*;scope=compile|runtime;inline=true
+						</Embed-Dependency>
 						<Private-Package>com.esri.geoevent.transport.mqtt</Private-Package>
 					</instructions>
 				</configuration>
