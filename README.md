@@ -28,7 +28,7 @@ Installing the built jar files:
 
 ## Resources
 
-* [Download the connector's tutorial](http://www.arcgis.com/home/item.html?id=TBD) from the ArcGIS GeoEvent Extension Gallery
+* [ArcGIS GeoEvent Extension Gallery](http://links.esri.com/geoevent-gallery)
 * [ArcGIS GeoEvent Extension for Server Resources](http://links.esri.com/geoevent)
 * [ArcGIS Blog](http://blogs.esri.com/esri/arcgis/)
 * [twitter@esri](http://twitter.com/esri)
