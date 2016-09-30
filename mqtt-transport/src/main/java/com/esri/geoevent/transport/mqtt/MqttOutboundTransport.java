@@ -27,6 +27,7 @@ package com.esri.geoevent.transport.mqtt;
 import java.nio.ByteBuffer;
 
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
@@ -47,6 +48,8 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	private int port;
 	private String host;
 	private String topic;
+	private String username;
+	private char[] password;
 	private MqttClient mqttClient;
 
 	public MqttOutboundTransport(TransportDefinition definition) throws ComponentException {
@@ -74,7 +77,22 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	private void connectMqtt() throws MqttException {
 		String url = "tcp://" + host + ":" + Integer.toString(port);
 		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
-		mqttClient.connect();
+
+		// Connect to the MQTT broker with username and password if both are
+		// available.
+		if (!username.equals("") && password.length > 0) {
+			// Create connection options for the user credentials
+			MqttConnectOptions options = new MqttConnectOptions();
+			options.setCleanSession(true);
+			options.setUserName(username);
+			options.setPassword(password);
+
+			mqttClient.connect(options);
+		} 
+		// Otherwise connect without username and password.
+		else {
+			mqttClient.connect();
+		}
 	}
 
 	private void applyProperties() throws Exception {
@@ -100,6 +118,18 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 			if (!value.trim().equals("")) {
 				topic = value;
 			}
+		}
+		
+		//Get the username as a simple String.
+		if (getProperty("username").isValid()) {
+			String value = (String) getProperty("username").getValue();
+			username = value.trim();
+		}
+
+		//Get the password as a DecryptedValue an convert it to an Char array.
+		if (getProperty("password").isValid()) {
+			String value = (String) getProperty("password").getDecryptedValue();
+			password = value.toCharArray();
 		}
 	}
 

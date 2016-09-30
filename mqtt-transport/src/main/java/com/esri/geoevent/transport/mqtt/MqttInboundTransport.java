@@ -30,6 +30,7 @@ import java.nio.ByteBuffer;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -42,124 +43,114 @@ import com.esri.ges.framework.i18n.BundleLoggerFactory;
 import com.esri.ges.transport.InboundTransportBase;
 import com.esri.ges.transport.TransportDefinition;
 
-public class MqttInboundTransport extends InboundTransportBase implements Runnable
-{
+public class MqttInboundTransport extends InboundTransportBase implements Runnable {
 
-	private static final BundleLogger	log			= BundleLoggerFactory.getLogger(MqttInboundTransport.class);
+	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttInboundTransport.class);
 
-	private Thread										thread	= null;
-	private int												port;
-	private String										host;
-	private String										topic;
-	private MqttClient								mqttClient;
+	private Thread thread = null;
+	private int port;
+	private String host;
+	private String topic;
+	private MqttClient mqttClient;
+	private String username;
+	private char[] password;
 
-	public MqttInboundTransport(TransportDefinition definition) throws ComponentException
-	{
+	public MqttInboundTransport(TransportDefinition definition) throws ComponentException {
 		super(definition);
 	}
 
 	@SuppressWarnings("incomplete-switch")
-	public void start() throws RunningException
-	{
-		try
-		{
-			switch (getRunningState())
-			{
-				case STARTING:
-				case STARTED:
-				case STOPPING:
-					return;
+	public void start() throws RunningException {
+		try {
+			switch (getRunningState()) {
+			case STARTING:
+			case STARTED:
+			case STOPPING:
+				return;
 			}
 			setRunningState(RunningState.STARTING);
 			thread = new Thread(this);
 			thread.start();
-		}
-		catch (Exception e)
-		{
+		} catch (Exception e) {
 			log.error("UNEXPECTED_ERROR_STARTING", e);
 			stop();
 		}
 	}
 
 	@Override
-	public void run()
-	{
+	public void run() {
 		this.receiveData();
 	}
 
-	private void receiveData()
-	{
-		try
-		{
+	private void receiveData() {
+		try {
 			applyProperties();
 			setRunningState(RunningState.STARTED);
 
 			String url = "tcp://" + host + ":" + Integer.toString(port);
 			mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
 
-			mqttClient.setCallback(new MqttCallback()
-				{
+			mqttClient.setCallback(new MqttCallback() {
 
-					@Override
-					public void messageArrived(String topic, MqttMessage message) throws Exception
-					{
-						try
-						{
-							receive(message.getPayload());
-						}
-						catch (RuntimeException e)
-						{
-							e.printStackTrace();
-						}
+				@Override
+				public void messageArrived(String topic, MqttMessage message) throws Exception {
+					try {
+						receive(message.getPayload());
+					} catch (RuntimeException e) {
+						e.printStackTrace();
 					}
+				}
 
-					@Override
-					public void deliveryComplete(IMqttDeliveryToken token)
-					{
-						// not used
-					}
+				@Override
+				public void deliveryComplete(IMqttDeliveryToken token) {
+					// not used
+				}
 
-					@Override
-					public void connectionLost(Throwable cause)
-					{
-						log.error("CONNECTION_LOST", cause.getLocalizedMessage());
-					}
-				});
-			mqttClient.connect();
+				@Override
+				public void connectionLost(Throwable cause) {
+					log.error("CONNECTION_LOST", cause.getLocalizedMessage());
+				}
+			});
+			// Connect to the MQTT broker with username and password if both are
+			// available.
+			if (!username.equals("") && password.length > 0) {
+				// Create connection options for the user credentials
+				MqttConnectOptions options = new MqttConnectOptions();
+				options.setCleanSession(true);
+				options.setUserName(username);
+				options.setPassword(password);
+
+				mqttClient.connect(options);
+			}
+			// Otherwise connect without username and password.
+			else {
+				mqttClient.connect();
+			}
 			mqttClient.subscribe(topic, 1);
 
-		}
-		catch (Throwable ex)
-		{
+		} catch (Throwable ex) {
 			log.error("UNEXPECTED_ERROR", ex);
 			setRunningState(RunningState.ERROR);
 		}
 	}
 
-	private void receive(byte[] bytes)
-	{
-		if (bytes != null && bytes.length > 0)
-		{
+	private void receive(byte[] bytes) {
+		if (bytes != null && bytes.length > 0) {
 			String str = new String(bytes);
 			str = str + '\n';
 			byte[] newBytes = str.getBytes();
 
 			ByteBuffer bb = ByteBuffer.allocate(newBytes.length);
-			try
-			{
+			try {
 				bb.put(newBytes);
 				bb.flip();
 				byteListener.receive(bb, "");
 				bb.clear();
-			}
-			catch (BufferOverflowException boe)
-			{
+			} catch (BufferOverflowException boe) {
 				log.error("BUFFER_OVERFLOW_ERROR", boe);
 				bb.clear();
 				setRunningState(RunningState.ERROR);
-			}
-			catch (Exception e)
-			{
+			} catch (Exception e) {
 				log.error("UNEXPECTED_ERROR2", e);
 				stop();
 				setRunningState(RunningState.ERROR);
@@ -167,59 +158,57 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 		}
 	}
 
-	private void applyProperties() throws Exception
-	{
+	private void applyProperties() throws Exception {
 		port = 1883; // default
-		if (getProperty("port").isValid())
-		{
+		if (getProperty("port").isValid()) {
 			int value = (Integer) getProperty("port").getValue();
-			if (value > 0 && value != port)
-			{
+			if (value > 0 && value != port) {
 				port = value;
 			}
 		}
 
 		host = "iot.eclipse.org"; // default
-		if (getProperty("host").isValid())
-		{
+		if (getProperty("host").isValid()) {
 			String value = (String) getProperty("host").getValue();
-			if (!value.trim().equals(""))
-			{
+			if (!value.trim().equals("")) {
 				host = value;
 			}
 		}
 
 		topic = "topic/sensor"; // default
-		if (getProperty("topic").isValid())
-		{
+		if (getProperty("topic").isValid()) {
 			String value = (String) getProperty("topic").getValue();
-			if (!value.trim().equals(""))
-			{
+			if (!value.trim().equals("")) {
 				topic = value;
 			}
 		}
+		//Get the username as a simple String.
+		if (getProperty("username").isValid()) {
+			String value = (String) getProperty("username").getValue();			
+		    username = value.trim(); 
+		}
+
+		//Get the password as a DecryptedValue an convert it to an Char array.
+		if (getProperty("password").isValid()) {
+			String value = (String) getProperty("password").getDecryptedValue();
+			password = value.toCharArray();
+		}
 	}
 
-	public synchronized void stop()
-	{
-		try
-		{
-			if (this.mqttClient != null)
-			{
+	public synchronized void stop() {
+		try {
+			if (this.mqttClient != null) {
 				this.mqttClient.disconnect();
 				this.mqttClient.close();
 			}
-		}
-		catch (MqttException ex)
-		{
+		} catch (MqttException ex) {
 			log.error("UNABLE_TO_CLOSE", ex);
 		}
 		setRunningState(RunningState.STOPPED);
 	}
 
 	@Override
-	public boolean isClusterable()
-	{
+	public boolean isClusterable() {
 		return false;
 	}
 }

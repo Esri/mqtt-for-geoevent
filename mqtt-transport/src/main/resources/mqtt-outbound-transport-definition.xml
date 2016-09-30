@@ -1,7 +1,7 @@
 <transport name="MqttOutboundTransport"
-	label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_LBL}" contact="yourname@yourcompany.com"
-	version="10.4.0" domain="com.esri.geoevent.transport.mqtt.outbound"
-	type="outbound">
+	label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_LBL}"
+	contact="sebastian.drost@hs-bochum.de" version="10.4.0"
+	domain="com.esri.geoevent.transport.mqtt.outbound" type="outbound">
 	<description>${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_DESC}
 	</description>
 	<propertyDefinitions>
@@ -19,5 +19,13 @@
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_TOPIC_DESC}"
 			propertyType="String" defaultValue="SBC/test" mandatory="true"
 			readOnly="false" />
+		<propertyDefinition propertyName="username"
+			label="${com.esri.geoevent.transport.mqtt-extended-transport.TRANSPORT_OUT_USERNAME_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-extended-transport.TRANSPORT_OUT_USERNAME_DESC}"
+			propertyType="String" defaultValue="" mandatory="false" readOnly="false" />
+		<propertyDefinition propertyName="password"
+			label="${com.esri.geoevent.transport.mqtt-extended-transport.TRANSPORT_OUT_PASSWORD_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-extended-transport.TRANSPORT_OUT_PASSWORD_DESC}"
+			propertyType="Password" defaultValue="" mandatory="false" readOnly="false" />
 	</propertyDefinitions>
 </transport>
