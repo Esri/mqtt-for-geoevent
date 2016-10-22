@@ -47,6 +47,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private int port;
 	private String host;
+	private String topic;
 	private String username;
 	private char[] password;
 	private MqttClient mqttClient;
@@ -111,7 +112,13 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 			}
 		}
 
-		
+		topic = "topic/actuators/light"; // default
+		if (getProperty("topic").isValid()) {
+			String value = (String) getProperty("topic").getValue();
+			if (!value.trim().equals("")) {
+				topic = value;
+			}
+		}
 
 		// Get the username as a simple String.
 		if (getProperty("username").isValid()) {
@@ -157,16 +164,10 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	 */
 	@Override
 	public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent) {
-		
-		String topic = "topic/actuators/light"; // default
-		if (getProperty("topic").isValid()) {
-			String value = (String) getProperty("topic").getValue();
-			if (!value.trim().equals("")) {
-				topic = value;
-			}
-		}
 
-		if (geoEvent != null) {
+		String topic = this.topic;
+
+		if (geoEvent != null && topic.contains("$")) {
 			// Get a formatted String with the value of a specified GeoEvent
 			// field for the MQTT topic.
 			topic = geoEvent.formatString(topic);
