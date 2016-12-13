@@ -33,12 +33,14 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 import com.esri.ges.core.component.ComponentException;
 import com.esri.ges.core.component.RunningException;
 import com.esri.ges.core.component.RunningState;
+import com.esri.ges.core.geoevent.GeoEvent;
 import com.esri.ges.framework.i18n.BundleLogger;
 import com.esri.ges.framework.i18n.BundleLoggerFactory;
+import com.esri.ges.transport.GeoEventAwareTransport;
 import com.esri.ges.transport.OutboundTransportBase;
 import com.esri.ges.transport.TransportDefinition;
 
-public class MqttOutboundTransport extends OutboundTransportBase
+public class MqttOutboundTransport extends OutboundTransportBase implements GeoEventAwareTransport
 {
 
 	private static final BundleLogger	log	= BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
@@ -73,6 +75,22 @@ public class MqttOutboundTransport extends OutboundTransportBase
 	@Override
 	public void receive(ByteBuffer buffer, String channelId)
 	{
+		receive(buffer, channelId, null);
+	}
+
+	@Override
+	public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent)
+	{
+		String topic = this.topic;
+		if (geoEvent != null && topic.contains("$"))
+		{
+			topic = geoEvent.formatString(topic);
+			if (topic.isEmpty() || topic.startsWith("$"))
+			{
+				return;
+			}
+		}
+
 		try
 		{
 			if (mqttClient == null || !mqttClient.isConnected())
