@@ -27,6 +27,7 @@ package com.esri.geoevent.transport.mqtt;
 import java.nio.ByteBuffer;
 
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
@@ -47,6 +48,8 @@ public class MqttOutboundTransport extends OutboundTransportBase
 	private String										host;
 	private String										topic;
 	private MqttClient								mqttClient;
+	private String										username;
+	private char[]										password;
 
 	public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
 	{
@@ -93,7 +96,18 @@ public class MqttOutboundTransport extends OutboundTransportBase
 	{
 		String url = "tcp://" + host + ":" + Integer.toString(port);
 		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
-		mqttClient.connect();
+
+		MqttConnectOptions options = new MqttConnectOptions();
+
+		// Connect with username and password if both are available.
+		if (!username.equals("") && password.length > 0)
+		{
+			options.setUserName(username);
+			options.setPassword(password);
+		}
+
+		options.setCleanSession(true);
+		mqttClient.connect(options);
 	}
 
 	private void applyProperties() throws Exception
@@ -126,6 +140,20 @@ public class MqttOutboundTransport extends OutboundTransportBase
 			{
 				topic = value;
 			}
+		}
+		
+		//Get the username as a simple String.
+		if (getProperty("username").isValid())
+		{
+			String value = (String) getProperty("username").getValue();
+			username = value.trim();
+		}
+
+		//Get the password as a DecryptedValue an convert it to an Char array.
+		if (getProperty("password").isValid())
+		{
+			String value = (String) getProperty("password").getDecryptedValue();
+			password = value.toCharArray();
 		}
 	}
 
