@@ -51,6 +51,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 	private int												port;
 	private String										host;
 	private String										topic;
+	private int												qos;
 	private MqttClient								mqttClient;
 
 	public MqttInboundTransport(TransportDefinition definition) throws ComponentException
@@ -126,7 +127,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 					}
 				});
 			mqttClient.connect();
-			mqttClient.subscribe(topic, 1);
+			mqttClient.subscribe(topic, qos);
 
 		}
 		catch (Throwable ex)
@@ -196,6 +197,21 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 			if (!value.trim().equals(""))
 			{
 				topic = value;
+			}
+		}
+
+		qos = 0;
+		if (getProperty("qos").isValid()) {
+			try
+			{
+				int value = Integer.parseInt(getProperty("qos").getValueAsString());
+				if ((value >= 0) && (value <= 2)) {
+					qos = value;
+				}
+			}
+			catch (NumberFormatException e)
+			{
+				throw e; // shouldn't ever happen
 			}
 		}
 	}

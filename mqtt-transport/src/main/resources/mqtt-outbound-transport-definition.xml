@@ -14,6 +14,22 @@
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_PORT_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_PORT_DESC}"
 			propertyType="Integer" defaultValue="1883" mandatory="true" readOnly="false" />
+		<propertyDefinition propertyName="qos"
+			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_QOS_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_QOS_DESC}"
+			propertyType="String" defaultValue="0" mandatory="true"
+			readOnly="false">
+			<allowedValues>
+				<value label="0 (at most once)">0</value>
+				<value label="1 (at least once)">1</value>
+				<value label="2 (exactly once)">2</value>
+			</allowedValues>
+		</propertyDefinition>
+		<propertyDefinition propertyName="retain"
+			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_RETAIN_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_RETAIN_DESC}"
+			propertyType="Boolean" defaultValue="false" mandatory="true"
+			readOnly="false" />
 		<propertyDefinition propertyName="topic"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_TOPIC_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_TOPIC_DESC}"

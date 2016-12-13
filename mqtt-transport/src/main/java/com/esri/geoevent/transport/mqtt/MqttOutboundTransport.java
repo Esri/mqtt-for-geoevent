@@ -46,6 +46,8 @@ public class MqttOutboundTransport extends OutboundTransportBase
 	private int												port;
 	private String										host;
 	private String										topic;
+	private int												qos;
+	private boolean										retain;
 	private MqttClient								mqttClient;
 
 	public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
@@ -81,7 +83,7 @@ public class MqttOutboundTransport extends OutboundTransportBase
 			byte[] b = new byte[buffer.remaining()];
 			buffer.get(b);
 
-			mqttClient.publish(topic, b, 2, true);
+			mqttClient.publish(topic, b, qos, retain);
 		}
 		catch (Exception e)
 		{
@@ -126,6 +128,29 @@ public class MqttOutboundTransport extends OutboundTransportBase
 			{
 				topic = value;
 			}
+		}
+
+		qos = 0;
+		if (getProperty("qos").isValid())
+		{
+			try
+			{
+				int value = Integer.parseInt(getProperty("qos").getValueAsString());
+				if ((value >= 0) && (value <= 2))
+				{
+					qos = value;
+				}
+			}
+			catch (NumberFormatException e)
+			{
+				throw e; // shouldn't ever happen but needed to be string for pick list
+			}
+		}
+
+		retain = false;
+		if (getProperty("retain").isValid())
+		{
+			retain = ((Boolean)getProperty("retain").getValue()).booleanValue();
 		}
 	}
 
