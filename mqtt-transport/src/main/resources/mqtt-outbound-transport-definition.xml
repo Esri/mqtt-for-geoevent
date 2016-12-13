@@ -20,9 +20,9 @@
 			propertyType="String" defaultValue="0" mandatory="true"
 			readOnly="false">
 			<allowedValues>
-				<value label="0 (at most once)">0</value>
-				<value label="1 (at least once)">1</value>
-				<value label="2 (exactly once)">2</value>
+				<value label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_COMMON_QOS_0_LBL}">0</value>
+				<value label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_COMMON_QOS_1_LBL}">1</value>
+				<value label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_COMMON_QOS_2_LBL}">2</value>
 			</allowedValues>
 		</propertyDefinition>
 		<propertyDefinition propertyName="retain"
