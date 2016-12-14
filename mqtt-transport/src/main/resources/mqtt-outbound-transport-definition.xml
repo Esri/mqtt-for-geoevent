@@ -8,12 +8,8 @@
 		<propertyDefinition propertyName="host"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_HOST_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_HOST_DESC}"
-			propertyType="String" defaultValue="test.mosquitto.org" mandatory="true"
+			propertyType="String" defaultValue="tcp://iot.eclipse.org:1883" mandatory="true"
 			readOnly="false" />
-		<propertyDefinition propertyName="port"
-			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_PORT_LBL}"
-			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_PORT_DESC}"
-			propertyType="Integer" defaultValue="1883" mandatory="true" readOnly="false" />
 		<propertyDefinition propertyName="topic"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_TOPIC_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_TOPIC_DESC}"

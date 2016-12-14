@@ -26,6 +26,10 @@ package com.esri.geoevent.transport.mqtt;
 
 import java.nio.ByteBuffer;
 
+import java.net.MalformedURLException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -45,6 +49,7 @@ public class MqttOutboundTransport extends OutboundTransportBase
 
 	private int												port;
 	private String										host;
+	private boolean										ssl;
 	private String										topic;
 	private MqttClient								mqttClient;
 
@@ -91,30 +96,33 @@ public class MqttOutboundTransport extends OutboundTransportBase
 
 	private void connectMqtt() throws MqttException
 	{
-		String url = "tcp://" + host + ":" + Integer.toString(port);
+		String url = (ssl ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
 		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
 		mqttClient.connect();
 	}
 
 	private void applyProperties() throws Exception
 	{
-		port = 1883; // default
-		if (getProperty("port").isValid())
-		{
-			int value = (Integer) getProperty("port").getValue();
-			if (value > 0 && value != port)
-			{
-				port = value;
-			}
-		}
-
+		ssl = false;
+		port = 1883;
 		host = "iot.eclipse.org"; // default
 		if (getProperty("host").isValid())
 		{
 			String value = (String) getProperty("host").getValue();
 			if (!value.trim().equals(""))
 			{
-				host = value;
+				Matcher matcher = Pattern.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE).matcher(value);
+				if (matcher.matches())
+				{
+					ssl = "ssl".equalsIgnoreCase(matcher.group(1));
+					host = matcher.group(2);
+					port = matcher.start(3) > -1 ? Integer.parseInt(matcher.group(3)) :
+									ssl ? 8883 : 1883; 
+				}
+				else
+				{
+					throw new MalformedURLException("Invalid MQTT Host URL");
+				}
 			}
 		}
 
