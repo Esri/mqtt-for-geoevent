@@ -13,18 +13,11 @@
 	<name>Esri :: GeoEvent :: Transport :: MQTT Transport</name>
 	<packaging>bundle</packaging>
 
-	<repositories>
-		<repository>
-			<id>Eclipse Paho Repo</id>
-			<url>https://repo.eclipse.org/content/repositories/paho-snapshots</url>
-		</repository>
-	</repositories>
-
 	<dependencies>
 		<dependency>
 			<groupId>org.eclipse.paho</groupId>
-			<artifactId>mqtt-client</artifactId>
-			<version>0.4.1-SNAPSHOT</version>
+			<artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+			<version>1.1.0</version>
 		</dependency>
 	</dependencies>
 
@@ -40,6 +33,7 @@
 						<Bundle-ContactAddress>${contact.address}</Bundle-ContactAddress>
 						<Bundle-Version>${project.version}</Bundle-Version>
 						<Export-Package/>
+						<Import-Package>!com.ibm.mqttdirect.modules.local.bindings;*</Import-Package>
 						<Embed-Dependency>
 							*;scope=compile|runtime;inline=true
 						</Embed-Dependency>
