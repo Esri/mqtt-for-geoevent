@@ -43,6 +43,7 @@ public class MqttOutboundTransport extends OutboundTransportBase
 
 	private static final BundleLogger	log	= BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
+	private boolean										secure;
 	private int												port;
 	private String										host;
 	private String										topic;
@@ -91,20 +92,37 @@ public class MqttOutboundTransport extends OutboundTransportBase
 
 	private void connectMqtt() throws MqttException
 	{
-		String url = "tcp://" + host + ":" + Integer.toString(port);
+		String url = (secure ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
 		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
 		mqttClient.connect();
 	}
 
 	private void applyProperties() throws Exception
 	{
-		port = 1883; // default
-		if (getProperty("port").isValid())
+		secure = false;
+		if (getProperty("secure").isValid()) {
+			secure = (Boolean) getProperty("secure").getValue();
+		}
+		if (secure)
 		{
-			int value = (Integer) getProperty("port").getValue();
-			if (value > 0 && value != port)
+			port = 8883;
+			if (getProperty("securePort").isValid())
 			{
-				port = value;
+				int value = (Integer) getProperty("securePort").getValue();
+				if (value > 0 && value != port) {
+					port = value;
+				}
+			}
+		}
+		else
+		{
+			port = 1883;
+			if (getProperty("port").isValid())
+			{
+				int value = (Integer) getProperty("port").getValue();
+				if (value > 0 && value != port) {
+					port = value;
+				}
 			}
 		}
 
