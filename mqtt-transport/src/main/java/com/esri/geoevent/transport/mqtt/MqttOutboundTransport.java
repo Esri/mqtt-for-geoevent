@@ -123,10 +123,17 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 		MqttConnectOptions options = new MqttConnectOptions();
 
 		// Connect with username and password if both are available.
-		if (!username.equals("") && password.length > 0)
+		if (username != null && password != null && !username.isEmpty() && password.length > 0)
 		{
 			options.setUserName(username);
 			options.setPassword(password);
+		}
+
+		{
+			// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
+			java.util.Properties sslProperties = new java.util.Properties();
+			sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
+			options.setSSLProperties(sslProperties);
 		}
 
 		options.setCleanSession(true);
@@ -169,17 +176,25 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 		}
 		
 		//Get the username as a simple String.
+		username = null;
 		if (getProperty("username").isValid())
 		{
 			String value = (String) getProperty("username").getValue();
-			username = value.trim();
+			if (value != null)
+			{
+				username = value.trim();
+			}
 		}
 
 		//Get the password as a DecryptedValue an convert it to an Char array.
+		password = null;
 		if (getProperty("password").isValid())
 		{
 			String value = (String) getProperty("password").getDecryptedValue();
-			password = value.toCharArray();
+			if (value != null)
+			{
+				password = value.toCharArray();
+			}
 		}
 	}
 
