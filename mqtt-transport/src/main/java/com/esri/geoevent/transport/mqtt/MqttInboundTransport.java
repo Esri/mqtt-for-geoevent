@@ -34,6 +34,7 @@ import java.util.regex.Pattern;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
@@ -57,6 +58,8 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 	private boolean										ssl;
 	private String										topic;
 	private MqttClient								mqttClient;
+	private String										username;
+	private char[]										password;
 
 	public MqttInboundTransport(TransportDefinition definition) throws ComponentException
 	{
@@ -130,7 +133,18 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 						log.error("CONNECTION_LOST", cause.getLocalizedMessage());
 					}
 				});
-			mqttClient.connect();
+
+			MqttConnectOptions options = new MqttConnectOptions();
+
+			// Connect with username and password if both are available.
+			if (!username.equals("") && password.length > 0)
+			{
+				options.setUserName(username);
+				options.setPassword(password);
+			}
+            
+			options.setCleanSession(true);
+			mqttClient.connect(options);
 			mqttClient.subscribe(topic, 1);
 
 		}
@@ -205,6 +219,19 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 			{
 				topic = value;
 			}
+		}
+		//Get the username as a simple String.
+		if (getProperty("username").isValid())
+		{
+			String value = (String) getProperty("username").getValue();
+			username = value.trim(); 
+		}
+
+		//Get the password as a DecryptedValue an convert it to an Char array.
+		if (getProperty("password").isValid())
+		{
+			String value = (String) getProperty("password").getDecryptedValue();
+			password = value.toCharArray();
 		}
 	}
 
