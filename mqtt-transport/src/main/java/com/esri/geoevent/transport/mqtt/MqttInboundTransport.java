@@ -57,6 +57,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 	private String										host;
 	private boolean										ssl;
 	private String										topic;
+	private int												qos;
 	private MqttClient								mqttClient;
 	private String										username;
 	private char[]										password;
@@ -153,7 +154,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 
 			options.setCleanSession(true);
 			mqttClient.connect(options);
-			mqttClient.subscribe(topic, 1);
+			mqttClient.subscribe(topic, qos);
 
 		}
 		catch (Throwable ex)
@@ -248,6 +249,21 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 			if (value != null)
 			{
 				password = value.toCharArray();
+			}
+		}
+
+		qos = 0;
+		if (getProperty("qos").isValid()) {
+			try
+			{
+				int value = Integer.parseInt(getProperty("qos").getValueAsString());
+				if ((value >= 0) && (value <= 2)) {
+					qos = value;
+				}
+			}
+			catch (NumberFormatException e)
+			{
+				throw e; // shouldn't ever happen
 			}
 		}
 	}
