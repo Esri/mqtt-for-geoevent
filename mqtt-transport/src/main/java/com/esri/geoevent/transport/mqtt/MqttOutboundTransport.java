@@ -46,6 +46,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private static final BundleLogger	log	= BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
+	private boolean										secure;
 	private int												port;
 	private String										host;
 	private String										topic;
@@ -114,16 +115,24 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private void connectMqtt() throws MqttException
 	{
-		String url = "tcp://" + host + ":" + Integer.toString(port);
+		String url = (secure ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
 		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
 
 		MqttConnectOptions options = new MqttConnectOptions();
 
 		// Connect with username and password if both are available.
-		if (!username.equals("") && password.length > 0)
+		if (username != null && password != null && !username.isEmpty() && password.length > 0)
 		{
 			options.setUserName(username);
 			options.setPassword(password);
+		}
+
+		if (secure)
+		{
+			// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
+			java.util.Properties sslProperties = new java.util.Properties();
+			sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
+			options.setSSLProperties(sslProperties);
 		}
 
 		options.setCleanSession(true);
@@ -132,13 +141,30 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private void applyProperties() throws Exception
 	{
-		port = 1883; // default
-		if (getProperty("port").isValid())
+		secure = false;
+		if (getProperty("secure").isValid()) {
+			secure = (Boolean) getProperty("secure").getValue();
+		}
+		if (secure)
 		{
-			int value = (Integer) getProperty("port").getValue();
-			if (value > 0 && value != port)
+			port = 8883;
+			if (getProperty("securePort").isValid())
 			{
-				port = value;
+				int value = (Integer) getProperty("securePort").getValue();
+				if (value > 0 && value != port) {
+					port = value;
+				}
+			}
+		}
+		else
+		{
+			port = 1883;
+			if (getProperty("port").isValid())
+			{
+				int value = (Integer) getProperty("port").getValue();
+				if (value > 0 && value != port) {
+					port = value;
+				}
 			}
 		}
 
@@ -163,17 +189,25 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 		}
 		
 		//Get the username as a simple String.
+		username = null;
 		if (getProperty("username").isValid())
 		{
 			String value = (String) getProperty("username").getValue();
-			username = value.trim();
+			if (value != null)
+			{
+				username = value.trim();
+			}
 		}
 
 		//Get the password as a DecryptedValue an convert it to an Char array.
+		password = null;
 		if (getProperty("password").isValid())
 		{
 			String value = (String) getProperty("password").getDecryptedValue();
-			password = value.toCharArray();
+			if (value != null)
+			{
+				password = value.toCharArray();
+			}
 		}
 
 		qos = 0;

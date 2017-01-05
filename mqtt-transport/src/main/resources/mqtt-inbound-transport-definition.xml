@@ -8,12 +8,23 @@
 		<propertyDefinition propertyName="host"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_HOST_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_HOST_DESC}"
-			propertyType="String" defaultValue="test.mosquitto.org" mandatory="true"
+			propertyType="String" defaultValue="iot.eclipse.org" mandatory="true"
+			readOnly="false" />
+		<propertyDefinition propertyName="secure"
+			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_SECURE_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_SECURE_DESC}"
+			propertyType="Boolean" defaultValue="false" mandatory="true"
 			readOnly="false" />
 		<propertyDefinition propertyName="port"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_PORT_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_PORT_DESC}"
-			propertyType="Integer" defaultValue="1883" mandatory="true" readOnly="false" />
+			propertyType="Integer" defaultValue="1883" mandatory="false" readOnly="false"
+			dependsOn="secure=false" />
+		<propertyDefinition propertyName="securePort"
+			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_SECURE_PORT_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_SECURE_PORT_DESC}"
+			propertyType="Integer" defaultValue="8883" mandatory="false" readOnly="false"
+			dependsOn="secure=true" />
 		<propertyDefinition propertyName="qos"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_QOS_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_QOS_DESC}"
@@ -28,7 +39,7 @@
 		<propertyDefinition propertyName="topic"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_TOPIC_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_TOPIC_DESC}"
-			propertyType="String" defaultValue="SBC/test" mandatory="true"
+			propertyType="String" defaultValue="topic/sensor" mandatory="true"
 			readOnly="false" />
 			<propertyDefinition propertyName="username"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_USERNAME_LBL}"
