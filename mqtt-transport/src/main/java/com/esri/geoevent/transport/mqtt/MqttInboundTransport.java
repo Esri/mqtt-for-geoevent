@@ -143,6 +143,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 				options.setPassword(password);
 			}
 
+			if (ssl)
 			{
 				// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
 				java.util.Properties sslProperties = new java.util.Properties();
