@@ -26,6 +26,10 @@ package com.esri.geoevent.transport.mqtt;
 
 import java.nio.ByteBuffer;
 
+import java.net.MalformedURLException;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttException;
@@ -48,7 +52,10 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private int												port;
 	private String										host;
+	private boolean										ssl;
 	private String										topic;
+	private int												qos;
+	private boolean										retain;
 	private MqttClient								mqttClient;
 	private String										username;
 	private char[]										password;
@@ -102,7 +109,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 			byte[] b = new byte[buffer.remaining()];
 			buffer.get(b);
 
-			mqttClient.publish(topic, b, 2, true);
+			mqttClient.publish(topic, b, qos, retain);
 		}
 		catch (Exception e)
 		{
@@ -112,16 +119,24 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private void connectMqtt() throws MqttException
 	{
-		String url = "tcp://" + host + ":" + Integer.toString(port);
+		String url = (ssl ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
 		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
 
 		MqttConnectOptions options = new MqttConnectOptions();
 
 		// Connect with username and password if both are available.
-		if (!username.equals("") && password.length > 0)
+		if (username != null && password != null && !username.isEmpty() && password.length > 0)
 		{
 			options.setUserName(username);
 			options.setPassword(password);
+		}
+
+		if (ssl)
+		{
+			// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
+			java.util.Properties sslProperties = new java.util.Properties();
+			sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
+			options.setSSLProperties(sslProperties);
 		}
 
 		options.setCleanSession(true);
@@ -130,23 +145,26 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private void applyProperties() throws Exception
 	{
-		port = 1883; // default
-		if (getProperty("port").isValid())
-		{
-			int value = (Integer) getProperty("port").getValue();
-			if (value > 0 && value != port)
-			{
-				port = value;
-			}
-		}
-
+		ssl = false;
+		port = 1883;
 		host = "iot.eclipse.org"; // default
 		if (getProperty("host").isValid())
 		{
 			String value = (String) getProperty("host").getValue();
 			if (!value.trim().equals(""))
 			{
-				host = value;
+				Matcher matcher = Pattern.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE).matcher(value);
+				if (matcher.matches())
+				{
+					ssl = "ssl".equalsIgnoreCase(matcher.group(1));
+					host = matcher.group(2);
+					port = matcher.start(3) > -1 ? Integer.parseInt(matcher.group(3)) :
+									ssl ? 8883 : 1883; 
+				}
+				else
+				{
+					throw new MalformedURLException("Invalid MQTT Host URL");
+				}
 			}
 		}
 
@@ -161,17 +179,48 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 		}
 		
 		//Get the username as a simple String.
+		username = null;
 		if (getProperty("username").isValid())
 		{
 			String value = (String) getProperty("username").getValue();
-			username = value.trim();
+			if (value != null)
+			{
+				username = value.trim();
+			}
 		}
 
 		//Get the password as a DecryptedValue an convert it to an Char array.
+		password = null;
 		if (getProperty("password").isValid())
 		{
 			String value = (String) getProperty("password").getDecryptedValue();
-			password = value.toCharArray();
+			if (value != null)
+			{
+				password = value.toCharArray();
+			}
+		}
+
+		qos = 0;
+		if (getProperty("qos").isValid())
+		{
+			try
+			{
+				int value = Integer.parseInt(getProperty("qos").getValueAsString());
+				if ((value >= 0) && (value <= 2))
+				{
+					qos = value;
+				}
+			}
+			catch (NumberFormatException e)
+			{
+				throw e; // shouldn't ever happen but needed to be string for pick list
+			}
+		}
+
+		retain = false;
+		if (getProperty("retain").isValid())
+		{
+			retain = ((Boolean)getProperty("retain").getValue()).booleanValue();
 		}
 	}
 
