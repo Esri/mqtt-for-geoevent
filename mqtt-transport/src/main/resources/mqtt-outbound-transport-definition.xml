@@ -22,8 +22,8 @@
 			</allowedValues>
 		</propertyDefinition>
 		<propertyDefinition propertyName="retain"
-			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_RETAIN_LBL}"
-			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_RETAIN_DESC}"
+			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_RETAIN_MESSAGE_LBL}"
+			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_RETAIN_MESSAGE_DESC}"
 			propertyType="Boolean" defaultValue="false" mandatory="true"
 			readOnly="false" />
 		<propertyDefinition propertyName="topic"
