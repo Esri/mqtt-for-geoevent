@@ -5,7 +5,7 @@
 	<parent>
 		<groupId>com.esri.geoevent.parent</groupId>
 		<artifactId>mqtt</artifactId>
-		<version>10.5.0</version>
+		<version>${project.version}</version>
 	</parent>
 
 	<groupId>com.esri.geoevent.transport</groupId>
