@@ -1,6 +1,6 @@
 <transport name="MqttOutboundTransport"
 	label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_LBL}" contact="yourname@yourcompany.com"
-	version="10.5.0" domain="com.esri.geoevent.transport.mqtt.outbound"
+	version="10.6.0" domain="com.esri.geoevent.transport.mqtt.outbound"
 	type="outbound">
 	<description>${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_DESC}
 	</description>
