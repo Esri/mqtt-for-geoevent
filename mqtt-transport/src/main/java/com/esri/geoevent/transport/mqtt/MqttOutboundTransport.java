@@ -26,14 +26,7 @@ package com.esri.geoevent.transport.mqtt;
 
 import java.nio.ByteBuffer;
 
-import java.net.MalformedURLException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.esri.ges.core.component.ComponentException;
 import com.esri.ges.core.component.RunningException;
@@ -48,21 +41,18 @@ import com.esri.ges.transport.TransportDefinition;
 public class MqttOutboundTransport extends OutboundTransportBase implements GeoEventAwareTransport
 {
 
-	private static final BundleLogger	log	= BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
+	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
-	private int												port;
-	private String										host;
-	private boolean										ssl;
-	private String										topic;
-	private int												qos;
-	private boolean										retain;
-	private MqttClient								mqttClient;
-	private String										username;
-	private char[]										password;
+	private MqttTransportUtil mqtt = new MqttTransportUtil();
+	private MqttClient mqttClient;
 
 	public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
 	{
 		super(definition);
+		if (log.isTraceEnabled())
+		{
+			log.trace("Created MQTT Outbound Transport");
+		}
 	}
 
 	@Override
@@ -70,12 +60,22 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	{
 		try
 		{
+			if (log.isTraceEnabled())
+			{
+				log.trace("Starting MQTT Outbound Transport");
+			}
 			setRunningState(RunningState.STARTING);
-			applyProperties();
-			connectMqtt();
+
+			mqtt.applyProperties(this);
+			mqttClient = mqtt.createMqttClient();
+
+			if (log.isTraceEnabled())
+			{
+				log.trace("Started MQTT Outbound Transport");
+			}
 			setRunningState(RunningState.STARTED);
-		}
-		catch (Exception e)
+
+		} catch (Exception e)
 		{
 			log.error("INIT_ERROR", e, this.getClass().getName());
 			setRunningState(RunningState.ERROR);
@@ -91,171 +91,70 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	@Override
 	public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent)
 	{
-		String topic = this.topic;
+		if (log.isTraceEnabled())
+		{
+			log.trace("receive(" + channelID + "): " + geoEvent);
+		}
+		String topic = mqtt.getTopic();
 		if (geoEvent != null && topic.contains("$"))
 		{
+			// Do field value substitution like "${field1}/${field2}"
+			if (log.isTraceEnabled())
+			{
+				log.trace("received geoEvent, creating output topic from field values using template '" + topic + "'.");
+			}
 			topic = geoEvent.formatString(topic);
-			if (topic.isEmpty() || topic.startsWith("$"))
-			{
-				return;
-			}
-		}
-
-		try
-		{
-			if (mqttClient == null || !mqttClient.isConnected())
-				connectMqtt();
-
-			byte[] b = new byte[buffer.remaining()];
-			buffer.get(b);
-
-			mqttClient.publish(topic, b, qos, retain);
-		}
-		catch (Exception e)
-		{
-			log.error("ERROR_PUBLISHING", e);
-		}
-	}
-
-	private void connectMqtt() throws MqttException
-	{
-		String url = (ssl ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
-		mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
-
-		MqttConnectOptions options = new MqttConnectOptions();
-
-		// Connect with username and password if both are available.
-		if (username != null && password != null && !username.isEmpty() && password.length > 0)
-		{
-			options.setUserName(username);
-			options.setPassword(password);
-		}
-
-		if (ssl)
-		{
-			// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
-			java.util.Properties sslProperties = new java.util.Properties();
-			sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
-			options.setSSLProperties(sslProperties);
-		}
-
-		options.setCleanSession(true);
-		mqttClient.connect(options);
-	}
-
-	private void applyProperties() throws Exception
-	{
-		ssl = false;
-		port = 1883;
-		host = "iot.eclipse.org"; // default
-		if (getProperty("host").isValid())
-		{
-			String value = (String) getProperty("host").getValue();
-			if (!value.trim().equals(""))
-			{
-				Matcher matcher = Pattern.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE).matcher(value);
-				if (matcher.matches())
-				{
-					ssl = "ssl".equalsIgnoreCase(matcher.group(1));
-					host = matcher.group(2);
-					port = matcher.start(3) > -1 ? Integer.parseInt(matcher.group(3)) :
-									ssl ? 8883 : 1883; 
-				}
-				else
-				{
-					throw new MalformedURLException("Invalid MQTT Host URL");
-				}
-			}
-		}
-
-		topic = "topic/actuators/light"; // default
-		if (getProperty("topic").isValid())
-		{
-			String value = (String) getProperty("topic").getValue();
-			if (!value.trim().equals(""))
-			{
-				topic = value;
-			}
 		}
 		
-		//Get the username as a simple String.
-		username = null;
-		if (getProperty("username").isValid())
+		if (log.isTraceEnabled())
 		{
-			String value = (String) getProperty("username").getValue();
-			if (value != null)
-			{
-				username = value.trim();
-			}
+			log.trace("Publishing outgoing bytes to topic '" + topic + "'.");
 		}
 
-		//Get the password as a DecryptedValue an convert it to an Char array.
-		password = null;
-		if (getProperty("password").isValid())
-		{
-			String value = (String) getProperty("password").getDecryptedValue();
-			if (value != null)
-			{
-				password = value.toCharArray();
-			}
-		}
-
-		qos = 0;
-		if (getProperty("qos").isValid())
+		if (mqtt.isTopicValid(topic))
 		{
 			try
 			{
-				int value = Integer.parseInt(getProperty("qos").getValueAsString());
-				if ((value >= 0) && (value <= 2))
-				{
-					qos = value;
-				}
-			}
-			catch (NumberFormatException e)
-			{
-				throw e; // shouldn't ever happen but needed to be string for pick list
-			}
-		}
+				if (mqttClient == null || !mqttClient.isConnected())
+					mqttClient = mqtt.createMqttClient();
 
-		retain = false;
-		if (getProperty("retain").isValid())
+				byte[] b = new byte[buffer.remaining()];
+				buffer.get(b);
+
+				mqttClient.publish(topic, b, mqtt.getQos(), mqtt.isRetain());
+			} catch (Exception e)
+			{
+				log.error("ERROR_PUBLISHING", e);
+			}
+		} else
 		{
-			retain = ((Boolean)getProperty("retain").getValue()).booleanValue();
+			log.error(
+					"GeoEvent Topic '" + topic + "' is not valid, GeoEvent not published to MQTT output: " + geoEvent);
 		}
 	}
 
 	@Override
 	public synchronized void stop()
 	{
+		if (log.isTraceEnabled())
+		{
+			log.trace("Stopping MQTT output...");
+		}
 		setRunningState(RunningState.STOPPING);
 
-		if (this.mqttClient != null)
-			disconnectMqtt();
-
-		setRunningState(RunningState.STOPPED);
-	}
-
-	private void disconnectMqtt()
-	{
 		try
 		{
-			if (mqttClient != null)
-			{
-				if (mqttClient.isConnected())
-				{
-					mqttClient.disconnect();
-					mqttClient.close();
-				}
-			}
-		}
-		catch (MqttException e)
-		{
-			log.error("UNABLE_TO_CLOSE", e);
-		}
-		finally
+			mqtt.disconnectMqtt(mqttClient);
+		} finally
 		{
 			mqttClient = null;
 		}
+
+		if (log.isTraceEnabled())
+		{
+			log.trace("Stopped MQTT output.");
+		}
+		setRunningState(RunningState.STOPPED);
 	}
 
 }

@@ -27,17 +27,10 @@ package com.esri.geoevent.transport.mqtt;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 
-import java.net.MalformedURLException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.esri.ges.core.component.ComponentException;
 import com.esri.ges.core.component.RunningException;
@@ -50,21 +43,19 @@ import com.esri.ges.transport.TransportDefinition;
 public class MqttInboundTransport extends InboundTransportBase implements Runnable
 {
 
-	private static final BundleLogger	log			= BundleLoggerFactory.getLogger(MqttInboundTransport.class);
+	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttInboundTransport.class);
 
-	private Thread										thread	= null;
-	private int												port;
-	private String										host;
-	private boolean										ssl;
-	private String										topic;
-	private int												qos;
-	private MqttClient								mqttClient;
-	private String										username;
-	private char[]										password;
+	private MqttTransportUtil mqtt = new MqttTransportUtil();
+	private Thread thread = null;
+	private MqttClient mqttClient;
 
 	public MqttInboundTransport(TransportDefinition definition) throws ComponentException
 	{
 		super(definition);
+		if (log.isTraceEnabled())
+		{
+			log.trace("Created MQTT Inbound Transport");
+		}
 	}
 
 	@SuppressWarnings("incomplete-switch")
@@ -74,16 +65,19 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 		{
 			switch (getRunningState())
 			{
-				case STARTING:
-				case STARTED:
-				case STOPPING:
-					return;
+			case STARTING:
+			case STARTED:
+			case STOPPING:
+				return;
+			}
+			if (log.isTraceEnabled())
+			{
+				log.trace("Starting MQTT Inbound Transport");
 			}
 			setRunningState(RunningState.STARTING);
 			thread = new Thread(this);
 			thread.start();
-		}
-		catch (Exception e)
+		} catch (Exception e)
 		{
 			log.error("UNEXPECTED_ERROR_STARTING", e);
 			stop();
@@ -93,74 +87,54 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 	@Override
 	public void run()
 	{
-		this.receiveData();
-	}
-
-	private void receiveData()
-	{
 		try
 		{
-			applyProperties();
+			mqtt.applyProperties(this);
+			mqttClient = mqtt.createMqttClient(new MqttCallback()
+			{
+
+				@Override
+				public void messageArrived(String topic, MqttMessage message) throws Exception
+				{
+					try
+					{
+						if (log.isTraceEnabled())
+						{
+							log.trace("messageArrived: " + topic + "(" + message + ")");
+						}
+						receive(message.getPayload());
+					} catch (RuntimeException e)
+					{
+						e.printStackTrace();
+					}
+				}
+
+				@Override
+				public void deliveryComplete(IMqttDeliveryToken token)
+				{
+					// not used
+				}
+
+				@Override
+				public void connectionLost(Throwable cause)
+				{
+					log.error("CONNECTION_LOST", cause.getLocalizedMessage());
+				}
+			});
+
+			mqttClient.subscribe(mqtt.getTopic(), mqtt.getQos());
+
+			if (log.isTraceEnabled())
+			{
+				log.trace("Started MQTT Inbound Transport");
+			}
 			setRunningState(RunningState.STARTED);
 
-			String url = (ssl ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
-			mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
-
-			mqttClient.setCallback(new MqttCallback()
-				{
-
-					@Override
-					public void messageArrived(String topic, MqttMessage message) throws Exception
-					{
-						try
-						{
-							receive(message.getPayload());
-						}
-						catch (RuntimeException e)
-						{
-							e.printStackTrace();
-						}
-					}
-
-					@Override
-					public void deliveryComplete(IMqttDeliveryToken token)
-					{
-						// not used
-					}
-
-					@Override
-					public void connectionLost(Throwable cause)
-					{
-						log.error("CONNECTION_LOST", cause.getLocalizedMessage());
-					}
-				});
-
-			MqttConnectOptions options = new MqttConnectOptions();
-
-			// Connect with username and password if both are available.
-			if (username != null && password != null && !username.isEmpty() && password.length > 0)
-			{
-				options.setUserName(username);
-				options.setPassword(password);
-			}
-
-			if (ssl)
-			{
-				// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
-				java.util.Properties sslProperties = new java.util.Properties();
-				sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
-				options.setSSLProperties(sslProperties);
-			}
-
-			options.setCleanSession(true);
-			mqttClient.connect(options);
-			mqttClient.subscribe(topic, qos);
-
-		}
-		catch (Throwable ex)
+		} catch (Throwable ex)
 		{
 			log.error("UNEXPECTED_ERROR", ex);
 			setRunningState(RunningState.ERROR);
+			setErrorMessage("UNEXPECTED_ERROR:" + ex.getMessage());
 		}
 	}
 
@@ -168,8 +142,16 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 	{
 		if (bytes != null && bytes.length > 0)
 		{
+			if (log.isTraceEnabled())
+			{
+				log.trace("Received some bytes");
+			}
 			String str = new String(bytes);
 			str = str + '\n';
+			if (log.isDebugEnabled())
+			{
+				log.debug("Byte String received '" + str + "'");
+			}
 			byte[] newBytes = str.getBytes();
 
 			ByteBuffer bb = ByteBuffer.allocate(newBytes.length);
@@ -179,110 +161,43 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 				bb.flip();
 				byteListener.receive(bb, "");
 				bb.clear();
-			}
-			catch (BufferOverflowException boe)
+				if (log.isTraceEnabled())
+				{
+					log.trace("Received bytes sent to adaptor");
+				}
+			} catch (BufferOverflowException boe)
 			{
 				log.error("BUFFER_OVERFLOW_ERROR", boe);
 				bb.clear();
-				setRunningState(RunningState.ERROR);
-			}
-			catch (Exception e)
+			} catch (Exception e)
 			{
 				log.error("UNEXPECTED_ERROR2", e);
 				stop();
 				setRunningState(RunningState.ERROR);
-			}
-		}
-	}
-
-	private void applyProperties() throws Exception
-	{
-		ssl = false;
-		port = 1883;
-		host = "iot.eclipse.org"; // default
-		if (getProperty("host").isValid())
-		{
-			String value = (String) getProperty("host").getValue();
-			if (!value.trim().equals(""))
-			{
-				Matcher matcher = Pattern.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE).matcher(value);
-				if (matcher.matches())
-				{
-					ssl = "ssl".equalsIgnoreCase(matcher.group(1));
-					host = matcher.group(2);
-					port = matcher.start(3) > -1 ? Integer.parseInt(matcher.group(3)) :
-									ssl ? 8883 : 1883; 
-				}
-				else
-				{
-					throw new MalformedURLException("Invalid MQTT Host URL");
-				}
-			}
-		}
-
-		topic = "topic/sensor"; // default
-		if (getProperty("topic").isValid())
-		{
-			String value = (String) getProperty("topic").getValue();
-			if (!value.trim().equals(""))
-			{
-				topic = value;
-			}
-		}
-
-		//Get the username as a simple String.
-		username = null;
-		if (getProperty("username").isValid())
-		{
-			String value = (String) getProperty("username").getValue();
-			if (value != null)
-			{
-				username = value.trim();
-			}
-		}
-
-		//Get the password as a DecryptedValue an convert it to an Char array.
-		password = null;
-		if (getProperty("password").isValid())
-		{
-			String value = (String) getProperty("password").getDecryptedValue();
-			if (value != null)
-			{
-				password = value.toCharArray();
-			}
-		}
-
-		qos = 0;
-		if (getProperty("qos").isValid()) {
-			try
-			{
-				int value = Integer.parseInt(getProperty("qos").getValueAsString());
-				if ((value >= 0) && (value <= 2)) {
-					qos = value;
-				}
-			}
-			catch (NumberFormatException e)
-			{
-				throw e; // shouldn't ever happen
+				setErrorMessage("Unexcpected Error: " + e.getMessage());
 			}
 		}
 	}
 
 	public synchronized void stop()
 	{
+		if (log.isTraceEnabled())
+		{
+			log.trace("Stopping...");
+		}
 		try
 		{
-			if (this.mqttClient != null)
-			{
-				this.mqttClient.disconnect();
-				this.mqttClient.close();
-			}
-		}
-		catch (MqttException ex)
+			mqtt.disconnectMqtt(mqttClient);
+
+		} finally
 		{
-			log.error("UNABLE_TO_CLOSE", ex);
+			mqttClient = null;
 		}
 		setRunningState(RunningState.STOPPED);
+		if (log.isTraceEnabled())
+		{
+			log.trace("Stopped");
+		}
 	}
 
 	@Override
