@@ -1,5 +1,5 @@
 /*
-  Copyright 1995-2015 Esri
+  Copyright 1995-2019 Esri
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
 	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
-  private final MqttTransportUtil   mqtt      = new MqttTransportUtil(log);
+  private final MqttClientManager   mqttClientManager      = new MqttClientManager(log);
 	private MqttClient mqttClient;
   private ScheduledExecutorService  executor  = Executors.newSingleThreadScheduledExecutor();
   private boolean                   isStarted = false;
@@ -67,8 +67,8 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
       try
       {
-			mqtt.applyProperties(this);
-			mqttClient = mqtt.createMqttClient();
+        mqttClientManager.applyProperties(this);
+        mqttClient = mqttClientManager.createMqttClient();
         mqttClient.connect();
 
         setRunningState(RunningState.STARTED);
@@ -99,7 +99,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	{
     log.trace("receive {0}: {1}", channelID, geoEvent);
 
-		String topic = mqtt.getTopic();
+    String topic = mqttClientManager.getTopic();
 		if (geoEvent != null && topic.contains("$"))
 		{
       log.trace("received geoEvent, creating output topic from field values using template {0}", topic);
@@ -108,7 +108,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 		}
 		
     log.trace("Publishing outgoing bytes to topic {0}", topic);
-		if (mqtt.isTopicValid(topic))
+    if (mqttClientManager.isTopicValid(topic))
 		{
 			try
 			{
@@ -117,12 +117,12 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
         if (mqttClient == null || !mqttClient.isConnected())
         {
-          mqtt.disconnectMqtt(mqttClient);
-          mqtt.applyProperties(this);
-          mqttClient = mqtt.createMqttClient();
+          mqttClientManager.disconnectMqtt(mqttClient);
+          mqttClientManager.applyProperties(this);
+          mqttClient = mqttClientManager.createMqttClient();
           mqttClient.connect();
         }
-				mqttClient.publish(topic, b, mqtt.getQos(), mqtt.isRetain());
+        mqttClient.publish(topic, b, mqttClientManager.getQos(), mqttClientManager.isRetain());
         setErrorMessage(null);
       }
       catch (Exception e)
@@ -132,7 +132,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
           String errormsg = log.translate("ERROR_PUBLISHING", e.getMessage());
           log.error(errormsg, e);
           setErrorMessage(errormsg);
-          mqtt.disconnectMqtt(mqttClient);
+          mqttClientManager.disconnectMqtt(mqttClient);
           setRunningState(RunningState.ERROR);
           executor.schedule(this, 3, TimeUnit.SECONDS);
         }
@@ -168,7 +168,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
   {
 		try
 		{
-			mqtt.disconnectMqtt(mqttClient);
+      mqttClientManager.disconnectMqtt(mqttClient);
     }
     catch (Throwable e)
     { // pass

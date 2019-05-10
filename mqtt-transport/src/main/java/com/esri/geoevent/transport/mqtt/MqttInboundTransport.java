@@ -1,5 +1,5 @@
 /*
-  Copyright 1995-2015 Esri
+  Copyright 1995-2019 Esri
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -48,7 +48,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 
 	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttInboundTransport.class);
 
-  private MqttTransportUtil         mqtt      = new MqttTransportUtil(log);
+  private MqttClientManager         mqttClientManager      = new MqttClientManager(log);
 	private MqttClient mqttClient;
   private ScheduledExecutorService  executor;
   private boolean                   isStarted = false;
@@ -97,7 +97,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
           try
           {
             log.info("Disconnecting previous MQTT Client");
-            mqtt.disconnectMqtt(mqttClient);
+            mqttClientManager.disconnectMqtt(mqttClient);
           }
           finally
           {
@@ -105,8 +105,8 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
           }
         }
 
-			mqtt.applyProperties(this);
-			mqttClient = mqtt.createMqttClient(new MqttCallback()
+        mqttClientManager.applyProperties(this);
+        mqttClient = mqttClientManager.createMqttClient(new MqttCallback()
 			{
 
 				@Override
@@ -137,7 +137,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 			});
 
         mqttClient.connect();
-			mqttClient.subscribe(mqtt.getTopic(), mqtt.getQos());
+        mqttClient.subscribe(mqttClientManager.getTopic(), mqttClientManager.getQos());
 
 			setRunningState(RunningState.STARTED);
         log.info("Transport started mqtt client. Transport state set to STARTED.");
@@ -233,7 +233,7 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
   {
 		try
 		{
-			mqtt.disconnectMqtt(mqttClient);
+      mqttClientManager.disconnectMqtt(mqttClient);
     }
     catch (Throwable e)
     { // pass
