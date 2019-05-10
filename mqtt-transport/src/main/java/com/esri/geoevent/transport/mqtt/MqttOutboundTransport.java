@@ -25,6 +25,9 @@
 package com.esri.geoevent.transport.mqtt;
 
 import java.nio.ByteBuffer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.paho.client.mqttv3.MqttClient;
 
@@ -38,47 +41,50 @@ import com.esri.ges.transport.GeoEventAwareTransport;
 import com.esri.ges.transport.OutboundTransportBase;
 import com.esri.ges.transport.TransportDefinition;
 
-public class MqttOutboundTransport extends OutboundTransportBase implements GeoEventAwareTransport
+public class MqttOutboundTransport extends OutboundTransportBase implements GeoEventAwareTransport, Runnable
 {
 
 	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
-	private MqttTransportUtil mqtt = new MqttTransportUtil();
+  private final MqttTransportUtil   mqtt      = new MqttTransportUtil(log);
 	private MqttClient mqttClient;
+  private ScheduledExecutorService  executor  = Executors.newSingleThreadScheduledExecutor();
+  private boolean                   isStarted = false;
 
 	public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
 	{
 		super(definition);
-		if (log.isTraceEnabled())
-		{
-			log.trace("Created MQTT Outbound Transport");
-		}
 	}
 
 	@Override
 	public void start() throws RunningException
 	{
-		try
-		{
-			if (log.isTraceEnabled())
+    isStarted = true;
+    if (getRunningState() == RunningState.STOPPED)
 			{
 				log.trace("Starting MQTT Outbound Transport");
-			}
 			setRunningState(RunningState.STARTING);
 
+      try
+      {
 			mqtt.applyProperties(this);
 			mqttClient = mqtt.createMqttClient();
+        mqttClient.connect();
 
-			if (log.isTraceEnabled())
+        setRunningState(RunningState.STARTED);
+        log.info("Transport started mqtt client. Transport state set to STARTED.");
+      }
+      catch (Exception e)
 			{
-				log.trace("Started MQTT Outbound Transport");
+        String errormsg = log.translate("{0} {1}", log.translate("INIT_ERROR", "outbound"), e.getMessage());
+        log.error(errormsg, e);
+        setRunningState(RunningState.ERROR);
+        setErrorMessage(errormsg);
+      }
 			}
-			setRunningState(RunningState.STARTED);
-
-		} catch (Exception e)
+    else
 		{
-			log.error("INIT_ERROR", e, this.getClass().getName());
-			setRunningState(RunningState.ERROR);
+      log.info("Cannot start transport: Not in STOPPED state.");
 		}
 	}
 
@@ -91,70 +97,117 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 	@Override
 	public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent)
 	{
-		if (log.isTraceEnabled())
-		{
-			log.trace("receive(" + channelID + "): " + geoEvent);
-		}
+    log.trace("receive {0}: {1}", channelID, geoEvent);
+
 		String topic = mqtt.getTopic();
 		if (geoEvent != null && topic.contains("$"))
 		{
+      log.trace("received geoEvent, creating output topic from field values using template {0}", topic);
 			// Do field value substitution like "${field1}/${field2}"
-			if (log.isTraceEnabled())
-			{
-				log.trace("received geoEvent, creating output topic from field values using template '" + topic + "'.");
-			}
 			topic = geoEvent.formatString(topic);
 		}
 		
-		if (log.isTraceEnabled())
-		{
-			log.trace("Publishing outgoing bytes to topic '" + topic + "'.");
-		}
-
+    log.trace("Publishing outgoing bytes to topic {0}", topic);
 		if (mqtt.isTopicValid(topic))
 		{
 			try
 			{
-				if (mqttClient == null || !mqttClient.isConnected())
-					mqttClient = mqtt.createMqttClient();
-
 				byte[] b = new byte[buffer.remaining()];
 				buffer.get(b);
 
+        if (mqttClient == null || !mqttClient.isConnected())
+        {
+          mqtt.disconnectMqtt(mqttClient);
+          mqtt.applyProperties(this);
+          mqttClient = mqtt.createMqttClient();
+          mqttClient.connect();
+        }
 				mqttClient.publish(topic, b, mqtt.getQos(), mqtt.isRetain());
-			} catch (Exception e)
+        setErrorMessage(null);
+      }
+      catch (Exception e)
 			{
-				log.error("ERROR_PUBLISHING", e);
+        try
+        {
+          String errormsg = log.translate("ERROR_PUBLISHING", e.getMessage());
+          log.error(errormsg, e);
+          setErrorMessage(errormsg);
+          mqtt.disconnectMqtt(mqttClient);
+          setRunningState(RunningState.ERROR);
+          executor.schedule(this, 3, TimeUnit.SECONDS);
+        }
+        finally
+        {
+          mqttClient = null;
 			}
-		} else
+      }
+    }
+    else
 		{
-			log.error(
-					"GeoEvent Topic '" + topic + "' is not valid, GeoEvent not published to MQTT output: " + geoEvent);
+      log.warn("GeoEvent Topic {0} is not valid, GeoEvent not published to MQTT output: {1}", topic, geoEvent);
 		}
 	}
 
 	@Override
 	public synchronized void stop()
 	{
-		if (log.isTraceEnabled())
+    isStarted = false;
+    log.trace("Stopping Transport");
+    if (getRunningState() != RunningState.STOPPING && getRunningState() != RunningState.STOPPED)
 		{
-			log.trace("Stopping MQTT output...");
-		}
-		setRunningState(RunningState.STOPPING);
+      setRunningState(RunningState.STOPPING);
 
+      disconnectClient();
+
+      log.info("Transport stopped mqtt client. Transport state set to STOPPED.");
+    }
+    setRunningState(RunningState.STOPPED);
+		}
+
+  private void disconnectClient()
+  {
 		try
 		{
 			mqtt.disconnectMqtt(mqttClient);
-		} finally
+    }
+    catch (Throwable e)
+    { // pass
+    }
+    finally
 		{
 			mqttClient = null;
 		}
+  }
 
-		if (log.isTraceEnabled())
+  @Override
+  public void run()
+  {
+    if (getRunningState() == RunningState.ERROR)
+    {
+      setRunningState(RunningState.STARTED);
+    }
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see com.esri.ges.transport.TransportBase#afterPropertiesSet()
+   */
+  @Override
+  public void afterPropertiesSet()
+  {
+    log.info("Setting Prpoerties, resetting client, and updating state");
+    super.afterPropertiesSet();
+    disconnectClient();
+    setErrorMessage("");
+    if (isStarted)
 		{
-			log.trace("Stopped MQTT output.");
+      setRunningState(RunningState.STARTED);
 		}
+    else
+    {
 		setRunningState(RunningState.STOPPED);
 	}
+  }
 
 }

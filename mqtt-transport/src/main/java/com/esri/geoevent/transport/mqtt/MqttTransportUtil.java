@@ -12,17 +12,15 @@ import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.esri.ges.core.property.Property;
 import com.esri.ges.framework.i18n.BundleLogger;
-import com.esri.ges.framework.i18n.BundleLoggerFactory;
 import com.esri.ges.transport.TransportBase;
 
 /**
  * Abstracts the MQTT properties, connection, and disconnect.
  * 
- * @author eric5946
  */
 public class MqttTransportUtil
 {
-	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttTransportUtil.class);
+  private final BundleLogger log;
 
 	private int port;
 	private String host;
@@ -33,12 +31,16 @@ public class MqttTransportUtil
 	private char[] password;
 	private boolean retain;
 
+  public MqttTransportUtil(BundleLogger logger)
+  {
+    this.log = logger;
+  }
+
 	/**
 	 * Parse out the MQTT properties and store them for connections.
 	 * 
 	 * @param transport
-	 *            The BaseTrasport that is supplying the properties (input or
-	 *            output)
+   *          The BaseTrasport that is supplying the properties (input or output)
 	 * @throws Exception
 	 */
 	public void applyProperties(TransportBase transport) throws Exception
@@ -50,15 +52,14 @@ public class MqttTransportUtil
 		String hostValue = getStringPropertyValue(transport, "host");
 		if (hostValue != null)
 		{
-			Matcher matcher = Pattern
-					.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE)
-					.matcher(hostValue);
+      Matcher matcher = Pattern.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE).matcher(hostValue);
 			if (matcher.matches())
 			{
 				ssl = "ssl".equalsIgnoreCase(matcher.group(1));
 				host = matcher.group(2);
 				port = matcher.start(3) > -1 ? Integer.parseInt(matcher.group(3)) : ssl ? 8883 : 1883;
-			} else
+      }
+      else
 			{
 				throw new MalformedURLException("Invalid MQTT Host URL '" + hostValue + "'");
 			}
@@ -88,11 +89,13 @@ public class MqttTransportUtil
 				if ((value >= 0) && (value <= 2))
 				{
 					qos = value;
-				} else if (log.isWarnEnabled())
+        }
+        else
 				{
-					log.warn("Property value for QOS is not valid (" + value + "). Using default of 0 instead.");
+          log.warn("Property value for QOS is not valid ({0}). Using default of 0 instead.", value);
 				}
-			} catch (NumberFormatException e)
+      }
+      catch (NumberFormatException e)
 			{
 				throw e; // shouldn't ever happen but needed to be string for pick list
 			}
@@ -112,18 +115,10 @@ public class MqttTransportUtil
 				}
 			}
 		}
-
-		if (log.isDebugEnabled())
-		{
-			log.debug("Applied Properties: SSL='" + ssl + "' PORT='" + port + "' HOST='" + host + "' TOPIC='" + topic
-					+ "' USERNAME='" + username + "' PASSWORD is " + (password == null ? "VALID" : "IN-VALID")
-					+ " QOS='" + qos + "' RETAIN='" + retain + "'");
-		}
 	}
 
 	/**
-	 * @return a new MQTT Client that is connected without a registered callback
-	 *         (used for outbound connections).
+   * @return a new MQTT Client that is connected without a registered callback (used for outbound connections).
 	 * @throws MqttException
 	 */
 	public MqttClient createMqttClient() throws MqttException
@@ -133,25 +128,19 @@ public class MqttTransportUtil
 
 	/**
 	 * @param callback
-	 *            An MQTT Callback to handle received messages from subscriptions.
-	 *            Can be null for outbound connections.
+   *          An MQTT Callback to handle received messages from subscriptions. Can be null for outbound connections.
 	 * @return a new MQTT Client that is connected
 	 * @throws MqttException
 	 */
 	public MqttClient createMqttClient(MqttCallback callback) throws MqttException
 	{
 		String url = (ssl ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
-		if (log.isDebugEnabled())
-		{
-			log.debug("Creating MQTT Broker client at URL '" + url + "'");
-		}
+    log.debug("Creating MQTT Broker client at URL {0}", url);
+
 		MqttClient mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
 		if (callback != null)
 		{
-			if (log.isDebugEnabled())
-			{
-				log.debug("Setting MQTT callback to receive messages");
-			}
+      log.trace("Setting MQTT callback to receive messages");
 			mqttClient.setCallback(callback);
 		}
 
@@ -160,10 +149,7 @@ public class MqttTransportUtil
 		// Connect with username and password if both are available.
 		if (username != null && password != null && !username.isEmpty() && password.length > 0)
 		{
-			if (log.isDebugEnabled())
-			{
-				log.debug("Connecting to MQTT Broker using credentials. Username='" + username + "'");
-			}
+      log.trace("Connecting to MQTT Broker using credentials. Username={0}", username);
 			options.setUserName(username);
 			options.setPassword(password);
 		}
@@ -171,10 +157,7 @@ public class MqttTransportUtil
 		if (ssl)
 		{
 			// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
-			if (log.isDebugEnabled())
-			{
-				log.debug("Connecting to MQTT Broker using SSL. NOTE: Only TLS 1.0 to 1.2 are supported.");
-			}
+      log.trace("Connecting to MQTT Broker using SSL. NOTE: Only TLS 1.0 to 1.2 are supported.");
 			java.util.Properties sslProperties = new java.util.Properties();
 			sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
 			options.setSSLProperties(sslProperties);
@@ -182,31 +165,22 @@ public class MqttTransportUtil
 
 		options.setCleanSession(true);
 
-		if (log.isTraceEnabled())
-		{
-			log.trace("Attempting to connect to MQTT Broker now...");
-		}
-		mqttClient.connect(options);
-		if (log.isInfoEnabled())
-		{
-			log.info("Connection " + (mqttClient.isConnected() ? "SUCCEEDED" : "FAILED") + " to MQTT Broker.");
-		}
+//    log.trace("Attempting to connect to MQTT Broker now...");
+//    mqttClient.connect(options);
+//    log.debug("Connection to MQTT Broker {0}", (mqttClient.isConnected() ? "SUCCEEDED" : "FAILED"));
 		return mqttClient;
 	}
 
 	/**
-	 * Checks to be sure the client is connected, then disconnects and closes the
-	 * client.
+   * Checks to be sure the client is connected, then disconnects and closes the client.
 	 * 
 	 * @param mqttClient
 	 *            The client to disconnect
 	 */
 	public void disconnectMqtt(MqttClient mqttClient)
 	{
-		if (log.isTraceEnabled())
-		{
 			log.trace("Disconnecting MQTT client...");
-		}
+
 		try
 		{
 			if (mqttClient != null)
@@ -215,33 +189,34 @@ public class MqttTransportUtil
 				{
 					mqttClient.disconnect();
 					mqttClient.close();
-				} else if (log.isTraceEnabled())
+        }
+        else
 				{
 					log.trace("MQTT client is already disconnected, can't disconnect.");
 				}
-			} else if (log.isTraceEnabled())
+      }
+      else
 			{
 				log.trace("MQTT client is already null, can't disconnect.");
 			}
-		} catch (MqttException e)
+    }
+    catch (MqttException e)
 		{
 			log.error("UNABLE_TO_CLOSE", e);
-		} finally
+    }
+    finally
 		{
 			mqttClient = null;
 		}
 	}
 
 	/**
-	 * Each topic must contain at least 1 character and the topic string permits
-	 * empty spaces. The forward slash alone is a valid topic. The $-symbol topics
-	 * are reserved for internal statistics of the MQTT broker ($ is not permitted).
+   * Each topic must contain at least 1 character and the topic string permits empty spaces. The forward slash alone is
+   * a valid topic. The $-symbol topics are reserved for internal statistics of the MQTT broker ($ is not permitted).
 	 * 
-	 * Topics are case-sensitive. For example, "myhome/temperature" and
-	 * "MyHome/Temperature" are two different topics.
+   * Topics are case-sensitive. For example, "myhome/temperature" and "MyHome/Temperature" are two different topics.
 	 * 
-	 * @return True if the topic is valid. False if it cannot be used as a MQTT
-	 *         topic.
+   * @return True if the topic is valid. False if it cannot be used as a MQTT topic.
 	 */
 	public boolean isTopicValid(String topic)
 	{
@@ -259,20 +234,23 @@ public class MqttTransportUtil
 					{
 						// Is longer than 1 character or equals '/'
 						result = true;
-					} else
+          }
+          else
 					{
-						log.error("GeoEvent TOPIC = '" + topic
-								+ "'. ERROR, it must be more than one character long or equal to '/'.");
+            log.error("GeoEvent TOPIC = {0}. ERROR, the topic must be more than one character long or equal to '/'.", topic);
+          }
 					}
-				} else
+        else
 				{
-					log.error("GeoEvent TOPIC = '" + topic + "'. ERROR, cannot contain the '$' symbol.");
+          log.error("GeoEvent TOPIC = {0}. ERROR, cannot contain the '$' symbol.", topic);
+        }
 				}
-			} else
+      else
 			{
 				log.error("GeoEvent TOPIC cannot be EMPTY.");
 			}
-		} else
+    }
+    else
 		{
 			log.error("GeoEvent TOPIC cannot be NULL.");
 		}
@@ -286,8 +264,7 @@ public class MqttTransportUtil
 	 *            The transport with the property values
 	 * @param propertyName
 	 *            The name of the property to get
-	 * @return Null if the property is not valdi, null, or empty string. The
-	 *         property string value otherwise.
+   * @return Null if the property is not valdi, null, or empty string. The property string value otherwise.
 	 */
 	public String getStringPropertyValue(TransportBase transport, String propertyName)
 	{
@@ -301,17 +278,20 @@ public class MqttTransportUtil
 				if (!value.isEmpty())
 				{
 					result = value.trim();
-				} else if (log.isTraceEnabled())
+        }
+        else
 				{
-					log.trace("Property '" + propertyName + "' is EMPTY.");
+          log.trace("Property {0} is EMPTY.", propertyName);
+        }
 				}
-			} else if (log.isTraceEnabled())
+      else
 			{
-				log.trace("Property '" + propertyName + "' is NULL.");
+        log.trace("Property {)} is NULL.", propertyName);
+      }
 			}
-		} else if (log.isTraceEnabled())
+    else
 		{
-			log.trace("Property '" + propertyName + "' is NOT VALID.");
+      log.trace("Property {0} is NOT VALID.", propertyName);
 		}
 		return result;
 	}
