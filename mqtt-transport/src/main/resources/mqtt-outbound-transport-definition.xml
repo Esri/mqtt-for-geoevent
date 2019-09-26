@@ -1,6 +1,5 @@
-<transport name="MqttOutboundTransport"
-	label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_LBL}" contact="yourname@yourcompany.com"
-	version="10.6.0" domain="com.esri.geoevent.transport.mqtt.outbound"
+<transport name="MQTT"
+	label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_LBL}" contact="geoevent@esri.com" domain="com.esri.geoevent.transport.outbound"
 	type="outbound">
 	<description>${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_DESC}
 	</description>
@@ -8,7 +7,7 @@
 		<propertyDefinition propertyName="host"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_HOST_LBL}"
 			description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_HOST_DESC}"
-			propertyType="String" defaultValue="tcp://iot.eclipse.org:1883" mandatory="true"
+			propertyType="String" defaultValue="tcp://127.0.0.1:1883" mandatory="true"
 			readOnly="false" />
 		<propertyDefinition propertyName="qos"
 			label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_OUT_QOS_LBL}"

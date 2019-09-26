@@ -1,5 +1,5 @@
 /*
-  Copyright 1995-2015 Esri
+  Copyright 1995-2019 Esri
 
     Licensed under the Apache License, Version 2.0 (the "License");
     you may not use this file except in compliance with the License.
@@ -26,18 +26,14 @@ package com.esri.geoevent.transport.mqtt;
 
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
-
-import java.net.MalformedURLException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
-import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
-import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
-import org.eclipse.paho.client.mqttv3.persist.MemoryPersistence;
 
 import com.esri.ges.core.component.ComponentException;
 import com.esri.ges.core.component.RunningException;
@@ -50,117 +46,111 @@ import com.esri.ges.transport.TransportDefinition;
 public class MqttInboundTransport extends InboundTransportBase implements Runnable
 {
 
-	private static final BundleLogger	log			= BundleLoggerFactory.getLogger(MqttInboundTransport.class);
+	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttInboundTransport.class);
 
-	private Thread										thread	= null;
-	private int												port;
-	private String										host;
-	private boolean										ssl;
-	private String										topic;
-	private int												qos;
-	private MqttClient								mqttClient;
-	private String										username;
-	private char[]										password;
+  private MqttClientManager         mqttClientManager      = new MqttClientManager(log);
+	private MqttClient mqttClient;
+  private ScheduledExecutorService  executor;
+  private boolean                   isStarted = false;
 
 	public MqttInboundTransport(TransportDefinition definition) throws ComponentException
 	{
 		super(definition);
 	}
 
-	@SuppressWarnings("incomplete-switch")
 	public void start() throws RunningException
 	{
+    isStarted = true;
+    if (getRunningState() == RunningState.STOPPED)
+    {
+      log.trace("Starting Transport");
+
+      this.setRunningState(RunningState.STARTING);
 		try
 		{
-			switch (getRunningState())
-			{
-				case STARTING:
-				case STARTED:
-				case STOPPING:
-					return;
+        executor = Executors.newSingleThreadScheduledExecutor();
+        executor.scheduleAtFixedRate(this, 1, 3, TimeUnit.SECONDS);
+
+        // STARTED state is set in the thread
 			}
-			setRunningState(RunningState.STARTING);
-			thread = new Thread(this);
-			thread.start();
-		}
-		catch (Exception e)
-		{
-			log.error("UNEXPECTED_ERROR_STARTING", e);
-			stop();
+      catch (Exception e)
+			{
+        String errormsg = log.translate("{0} {1}", log.translate("INIT_ERROR", "inbound"), e.getMessage());
+        log.error(errormsg, e);
+        setErrorMessage(errormsg);
+        stop();
+        setRunningState(RunningState.ERROR);
+			}
 		}
 	}
 
 	@Override
 	public void run()
 	{
-		this.receiveData();
-	}
-
-	private void receiveData()
-	{
+    if (mqttClient == null || !mqttClient.isConnected())
+    {
+      log.info("Creating new MQTT Client");
 		try
 		{
-			applyProperties();
-			setRunningState(RunningState.STARTED);
+        if (mqttClient != null)
+        {
+          try
+          {
+            log.info("Disconnecting previous MQTT Client");
+            mqttClientManager.disconnectMqtt(mqttClient);
+          }
+          finally
+          {
+            mqttClient = null;
+          }
+        }
 
-			String url = (ssl ? "ssl://" : "tcp://") + host + ":" + Integer.toString(port);
-			mqttClient = new MqttClient(url, MqttClient.generateClientId(), new MemoryPersistence());
+        mqttClientManager.applyProperties(this);
+        mqttClient = mqttClientManager.createMqttClient(new MqttCallback()
+			{
 
-			mqttClient.setCallback(new MqttCallback()
+				@Override
+				public void messageArrived(String topic, MqttMessage message) throws Exception
 				{
-
-					@Override
-					public void messageArrived(String topic, MqttMessage message) throws Exception
+					try
 					{
-						try
-						{
-							receive(message.getPayload());
+                log.trace("Message arrived on topic {0}: ( {1} )", topic, message);
+                receive(message.getPayload());
 						}
-						catch (RuntimeException e)
-						{
-							e.printStackTrace();
-						}
-					}
-
-					@Override
-					public void deliveryComplete(IMqttDeliveryToken token)
+              catch (RuntimeException e)
 					{
-						// not used
+                log.warn("ERROR_PUBLISHING", e);
 					}
+				}
 
-					@Override
-					public void connectionLost(Throwable cause)
-					{
-						log.error("CONNECTION_LOST", cause.getLocalizedMessage());
-					}
-				});
+				@Override
+				public void deliveryComplete(IMqttDeliveryToken token)
+				{
+					// not used
+				}
 
-			MqttConnectOptions options = new MqttConnectOptions();
+				@Override
+				public void connectionLost(Throwable cause)
+				{
+              log.warn("CONNECTION_LOST", cause, cause.getLocalizedMessage());
+				}
+			});
 
-			// Connect with username and password if both are available.
-			if (username != null && password != null && !username.isEmpty() && password.length > 0)
-			{
-				options.setUserName(username);
-				options.setPassword(password);
-			}
+        mqttClient.connect();
+        mqttClient.subscribe(mqttClientManager.getTopic(), mqttClientManager.getQos());
 
-			if (ssl)
-			{
-				// Support TLS only (1.0-1.2) as even SSL 3.0 has well known exploits
-				java.util.Properties sslProperties = new java.util.Properties();
-				sslProperties.setProperty("com.ibm.ssl.protocol", "TLS");
-				options.setSSLProperties(sslProperties);
-			}
+			setRunningState(RunningState.STARTED);
+        log.info("Transport started mqtt client. Transport state set to STARTED.");
 
-			options.setCleanSession(true);
-			mqttClient.connect(options);
-			mqttClient.subscribe(topic, qos);
-
-		}
-		catch (Throwable ex)
+      }
+      catch (Throwable ex)
 		{
-			log.error("UNEXPECTED_ERROR", ex);
+        String errormsg = log.translate("UNEXPECTED_ERROR", ex.getMessage());
+        log.error(errormsg, ex);
+        setErrorMessage(errormsg);
+        disconnectClient();
 			setRunningState(RunningState.ERROR);
+      }
 		}
 	}
 
@@ -168,8 +158,13 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 	{
 		if (bytes != null && bytes.length > 0)
 		{
+      log.debug("Received {0} bytes", bytes.length);
+
 			String str = new String(bytes);
 			str = str + '\n';
+
+      log.trace("Byte String received {0}", str);
+
 			byte[] newBytes = str.getBytes();
 
 			ByteBuffer bb = ByteBuffer.allocate(newBytes.length);
@@ -179,115 +174,90 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 				bb.flip();
 				byteListener.receive(bb, "");
 				bb.clear();
-			}
-			catch (BufferOverflowException boe)
+
+        log.trace("{0} received bytes sent on to the adaptor.", newBytes.length);
+				}
+      catch (BufferOverflowException boe)
 			{
 				log.error("BUFFER_OVERFLOW_ERROR", boe);
 				bb.clear();
-				setRunningState(RunningState.ERROR);
-			}
-			catch (Exception e)
+      }
+      catch (Exception e)
 			{
 				log.error("UNEXPECTED_ERROR2", e);
-				stop();
+        disconnectClient();
 				setRunningState(RunningState.ERROR);
-			}
-		}
-	}
-
-	private void applyProperties() throws Exception
-	{
-		ssl = false;
-		port = 1883;
-		host = "iot.eclipse.org"; // default
-		if (getProperty("host").isValid())
-		{
-			String value = (String) getProperty("host").getValue();
-			if (!value.trim().equals(""))
-			{
-				Matcher matcher = Pattern.compile("^(?:(tcp|ssl)://)?([-.a-z0-9]+)(?::([0-9]+))?$", Pattern.CASE_INSENSITIVE).matcher(value);
-				if (matcher.matches())
-				{
-					ssl = "ssl".equalsIgnoreCase(matcher.group(1));
-					host = matcher.group(2);
-					port = matcher.start(3) > -1 ? Integer.parseInt(matcher.group(3)) :
-									ssl ? 8883 : 1883; 
-				}
-				else
-				{
-					throw new MalformedURLException("Invalid MQTT Host URL");
-				}
-			}
-		}
-
-		topic = "topic/sensor"; // default
-		if (getProperty("topic").isValid())
-		{
-			String value = (String) getProperty("topic").getValue();
-			if (!value.trim().equals(""))
-			{
-				topic = value;
-			}
-		}
-
-		//Get the username as a simple String.
-		username = null;
-		if (getProperty("username").isValid())
-		{
-			String value = (String) getProperty("username").getValue();
-			if (value != null)
-			{
-				username = value.trim();
-			}
-		}
-
-		//Get the password as a DecryptedValue an convert it to an Char array.
-		password = null;
-		if (getProperty("password").isValid())
-		{
-			String value = (String) getProperty("password").getDecryptedValue();
-			if (value != null)
-			{
-				password = value.toCharArray();
-			}
-		}
-
-		qos = 0;
-		if (getProperty("qos").isValid()) {
-			try
-			{
-				int value = Integer.parseInt(getProperty("qos").getValueAsString());
-				if ((value >= 0) && (value <= 2)) {
-					qos = value;
-				}
-			}
-			catch (NumberFormatException e)
-			{
-				throw e; // shouldn't ever happen
+				setErrorMessage("Unexcpected Error: " + e.getMessage());
 			}
 		}
 	}
 
 	public synchronized void stop()
 	{
+    isStarted = false;
+    if (getRunningState() != RunningState.STOPPING && getRunningState() != RunningState.STOPPED)
+		{
+      setRunningState(RunningState.STOPPING);
+      log.trace("Stopping Transport");
+
+      if (executor != null)
+      {
+        try
+        {
+          executor.shutdownNow();
+          executor.awaitTermination(3, TimeUnit.SECONDS);
+        }
+        catch (Throwable e)
+        { // pass
+        }
+        finally
+        {
+          executor = null;
+        }
+      }
+
+      disconnectClient();
+
+      log.info("Transport stopped mqtt client and worker thread. Transport state set to STOPPED.");
+    }
+    setRunningState(RunningState.STOPPED);
+		}
+
+  @Override
+  public boolean isClusterable()
+  {
+    return false;
+  }
+
+  private void disconnectClient()
+  {
 		try
 		{
-			if (this.mqttClient != null)
-			{
-				this.mqttClient.disconnect();
-				this.mqttClient.close();
-			}
-		}
-		catch (MqttException ex)
+      mqttClientManager.disconnectMqtt(mqttClient);
+    }
+    catch (Throwable e)
+    { // pass
+    }
+    finally
 		{
-			log.error("UNABLE_TO_CLOSE", ex);
+			mqttClient = null;
 		}
-		setRunningState(RunningState.STOPPED);
 	}
 
 	@Override
-	public boolean isClusterable()
+  public void afterPropertiesSet()
+  {
+    log.info("Setting Prpoerties, resetting client, and updating state");
+    super.afterPropertiesSet();
+    disconnectClient();
+    setErrorMessage("");
+    if (isStarted)
+    {
+      setRunningState(RunningState.STARTED);
+    }
+    else
 	{
-		return false;
+      setRunningState(RunningState.STOPPED);
+    }
 	}
 }
