@@ -31,13 +31,17 @@ import com.esri.ges.transport.util.XmlTransportDefinition;
 
 public class MqttInboundTransportService extends TransportServiceBase
 {
-	public MqttInboundTransportService()
-	{
-		definition = new XmlTransportDefinition(getResourceAsStream("mqtt-inbound-transport-definition.xml"));
-	}
 
-	public Transport createTransport() throws ComponentException
-	{
-		return new MqttInboundTransport(definition);
-	}
+  public MqttInboundTransportService()
+  {
+    XmlTransportDefinition xmlAdapterDefinition = new XmlTransportDefinition(getResourceAsStream("mqtt-inbound-transport-definition.xml"));
+    definition = xmlAdapterDefinition;
+
+  }
+
+  public Transport createTransport() throws ComponentException
+  {
+    return new MqttInboundTransport(definition);
+  }
+
 }

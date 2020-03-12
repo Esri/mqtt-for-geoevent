@@ -50,7 +50,7 @@ public class MqttClientManager
   private String             topic;
   private int                qos;
   private String             username;
-  private char[]             password;
+  private String             password;
   private boolean            retain;
 
   public MqttClientManager(BundleLogger logger)
@@ -97,7 +97,8 @@ public class MqttClientManager
       String value = (String) transport.getProperty("password").getDecryptedValue();
       if (value != null)
       {
-        password = value.toCharArray();
+        // password = value.toCharArray();
+        password = value;
       }
     }
 
@@ -114,7 +115,7 @@ public class MqttClientManager
         }
         else
         {
-          log.warn("Property value for QOS is not valid ({0}). Using default of 0 instead.", value);
+          log.debug("Property value for QOS is not valid ({0}). Using default of 0 instead.", value);
         }
       }
       catch (NumberFormatException e)
@@ -137,6 +138,9 @@ public class MqttClientManager
         }
       }
     }
+
+    if (log.isTraceEnabled())
+      log.trace(this.toString());
   }
 
   /**
@@ -167,14 +171,22 @@ public class MqttClientManager
       mqttClient.setCallback(callback);
     }
 
+    getMqttClientOptions();
+
+    // Let the caller connect so they can handle connection failures and reconnects.
+    return mqttClient;
+  }
+
+  public MqttConnectOptions getMqttClientOptions()
+  {
     MqttConnectOptions options = new MqttConnectOptions();
 
     // Connect with username and password if both are available.
-    if (username != null && password != null && !username.isEmpty() && password.length > 0)
+    if (username != null && password != null && !username.isEmpty() && !password.isEmpty())
     {
       log.trace("Connecting to MQTT Broker using credentials. Username={0}", username);
       options.setUserName(username);
-      options.setPassword(password);
+      options.setPassword(password.toCharArray());
     }
 
     if (ssl)
@@ -187,9 +199,7 @@ public class MqttClientManager
     }
 
     options.setCleanSession(true);
-
-    // Let the caller connect so they can handle connection failures and reconnects.
-    return mqttClient;
+    return options;
   }
 
   /**
@@ -215,7 +225,7 @@ public class MqttClientManager
     }
     catch (MqttException e)
     {
-      log.error("UNABLE_TO_CLOSE", e);
+      log.debug("UNABLE_TO_CLOSE", e);
     }
     finally
     {
@@ -250,22 +260,22 @@ public class MqttClientManager
           }
           else
           {
-            log.error("GeoEvent TOPIC = {0}. ERROR, the topic must be more than one character long or equal to '/'.", topic);
+            log.debug("GeoEvent TOPIC = {0}. ERROR, the topic must be more than one character long or equal to '/'.", topic);
           }
         }
         else
         {
-          log.error("GeoEvent TOPIC = {0}. ERROR, cannot contain the '$' symbol.", topic);
+          log.debug("GeoEvent TOPIC = {0}. ERROR, cannot contain the '$' symbol.", topic);
         }
       }
       else
       {
-        log.error("GeoEvent TOPIC cannot be EMPTY.");
+        log.debug("GeoEvent TOPIC cannot be EMPTY.");
       }
     }
     else
     {
-      log.error("GeoEvent TOPIC cannot be NULL.");
+      log.debug("GeoEvent TOPIC cannot be NULL.");
     }
     return result;
   }
@@ -331,5 +341,11 @@ public class MqttClientManager
   public boolean isRetain()
   {
     return retain;
+  }
+
+  @Override
+  public String toString()
+  {
+    return "MqttClientManager [log=" + log + ", port=" + port + ", host=" + host + ", ssl=" + ssl + ", topic=" + topic + ", qos=" + qos + ", username=" + username + ", password=" + password + ", retain=" + retain + "]";
   }
 }

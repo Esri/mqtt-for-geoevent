@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import org.eclipse.paho.client.mqttv3.IMqttDeliveryToken;
 import org.eclipse.paho.client.mqttv3.MqttCallback;
 import org.eclipse.paho.client.mqttv3.MqttClient;
+import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 import com.esri.ges.core.component.ComponentException;
@@ -46,57 +47,57 @@ import com.esri.ges.transport.TransportDefinition;
 public class MqttInboundTransport extends InboundTransportBase implements Runnable
 {
 
-	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttInboundTransport.class);
+  private static final BundleLogger log               = BundleLoggerFactory.getLogger(MqttInboundTransport.class);
 
-  private MqttClientManager         mqttClientManager      = new MqttClientManager(log);
-	private MqttClient mqttClient;
+  private MqttClientManager         mqttClientManager = new MqttClientManager(log);
+  private MqttClient                mqttClient;
   private ScheduledExecutorService  executor;
-  private boolean                   isStarted = false;
+  private boolean                   isStarted         = false;
 
-	public MqttInboundTransport(TransportDefinition definition) throws ComponentException
-	{
-		super(definition);
-	}
+  public MqttInboundTransport(TransportDefinition definition) throws ComponentException
+  {
+    super(definition);
+  }
 
-	public void start() throws RunningException
-	{
+  public void start() throws RunningException
+  {
     isStarted = true;
     if (getRunningState() == RunningState.STOPPED)
     {
       log.trace("Starting Transport");
 
       this.setRunningState(RunningState.STARTING);
-		try
-		{
+      try
+      {
         executor = Executors.newSingleThreadScheduledExecutor();
         executor.scheduleAtFixedRate(this, 1, 3, TimeUnit.SECONDS);
 
         // STARTED state is set in the thread
-			}
+      }
       catch (Exception e)
-			{
+      {
         String errormsg = log.translate("{0} {1}", log.translate("INIT_ERROR", "inbound"), e.getMessage());
-        log.error(errormsg, e);
+        log.debug(errormsg, e);
         setErrorMessage(errormsg);
         stop();
         setRunningState(RunningState.ERROR);
-			}
-		}
-	}
+      }
+    }
+  }
 
-	@Override
-	public void run()
-	{
+  @Override
+  public void run()
+  {
     if (mqttClient == null || !mqttClient.isConnected())
     {
-      log.info("Creating new MQTT Client");
-		try
-		{
+      log.trace("Creating new MQTT Client");
+      try
+      {
         if (mqttClient != null)
         {
           try
           {
-            log.info("Disconnecting previous MQTT Client");
+            log.trace("Disconnecting previous MQTT Client");
             mqttClientManager.disconnectMqtt(mqttClient);
           }
           finally
@@ -106,97 +107,99 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
         }
 
         mqttClientManager.applyProperties(this);
+        MqttConnectOptions connectOptions = mqttClientManager.getMqttClientOptions();
         mqttClient = mqttClientManager.createMqttClient(new MqttCallback()
-			{
+          {
 
-				@Override
-				public void messageArrived(String topic, MqttMessage message) throws Exception
-				{
-					try
-					{
-                log.trace("Message arrived on topic {0}: ( {1} )", topic, message);
+            @Override
+            public void messageArrived(String topic, MqttMessage message) throws Exception
+            {
+              try
+              {
+                log.debug("Message arrived on topic {0}: ( {1} )", topic, message);
                 receive(message.getPayload());
-						}
+              }
               catch (RuntimeException e)
-					{
-                log.warn("ERROR_PUBLISHING", e);
-					}
-				}
+              {
+                log.debug("ERROR_PUBLISHING", e);
+              }
+            }
 
-				@Override
-				public void deliveryComplete(IMqttDeliveryToken token)
-				{
-					// not used
-				}
+            @Override
+            public void deliveryComplete(IMqttDeliveryToken token)
+            {
+              // not used
+            }
 
-				@Override
-				public void connectionLost(Throwable cause)
-				{
-              log.warn("CONNECTION_LOST", cause, cause.getLocalizedMessage());
-				}
-			});
+            @Override
+            public void connectionLost(Throwable cause)
+            {
+              log.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
+            }
+          });
 
-        mqttClient.connect();
+        log.trace("Connecting to mqtt using {}", mqttClientManager);
+        mqttClient.connect(connectOptions);
         mqttClient.subscribe(mqttClientManager.getTopic(), mqttClientManager.getQos());
 
-			setRunningState(RunningState.STARTED);
-        log.info("Transport started mqtt client. Transport state set to STARTED.");
+        setRunningState(RunningState.STARTED);
+        log.trace("Transport started mqtt client. Transport state set to STARTED.");
 
       }
       catch (Throwable ex)
-		{
+      {
         String errormsg = log.translate("UNEXPECTED_ERROR", ex.getMessage());
-        log.error(errormsg, ex);
+        log.debug(errormsg, ex);
         setErrorMessage(errormsg);
         disconnectClient();
-			setRunningState(RunningState.ERROR);
+        setRunningState(RunningState.ERROR);
       }
-		}
-	}
+    }
+  }
 
-	private void receive(byte[] bytes)
-	{
-		if (bytes != null && bytes.length > 0)
-		{
-      log.debug("Received {0} bytes", bytes.length);
+  private void receive(byte[] bytes)
+  {
+    if (bytes != null && bytes.length > 0)
+    {
+      log.trace("Received {0} bytes", bytes.length);
 
-			String str = new String(bytes);
-			str = str + '\n';
+      String str = new String(bytes);
+      str = str + '\n';
 
       log.trace("Byte String received {0}", str);
 
-			byte[] newBytes = str.getBytes();
+      byte[] newBytes = str.getBytes();
 
-			ByteBuffer bb = ByteBuffer.allocate(newBytes.length);
-			try
-			{
-				bb.put(newBytes);
-				bb.flip();
-				byteListener.receive(bb, "");
-				bb.clear();
+      ByteBuffer bb = ByteBuffer.allocate(newBytes.length);
+      try
+      {
+        bb.put(newBytes);
+        bb.flip();
+        byteListener.receive(bb, "");
+        bb.clear();
 
         log.trace("{0} received bytes sent on to the adaptor.", newBytes.length);
-				}
+      }
       catch (BufferOverflowException boe)
-			{
-				log.error("BUFFER_OVERFLOW_ERROR", boe);
-				bb.clear();
+      {
+        log.debug("BUFFER_OVERFLOW_ERROR", boe);
+        bb.clear();
       }
       catch (Exception e)
-			{
-				log.error("UNEXPECTED_ERROR2", e);
+      {
+        log.debug("UNEXPECTED_ERROR2", e);
         disconnectClient();
-				setRunningState(RunningState.ERROR);
-				setErrorMessage("Unexcpected Error: " + e.getMessage());
-			}
-		}
-	}
+        setRunningState(RunningState.ERROR);
+        setErrorMessage("Unexcpected Error: " + e.getMessage());
+      }
+    }
+  }
 
-	public synchronized void stop()
-	{
+  public synchronized void stop()
+  {
     isStarted = false;
     if (getRunningState() != RunningState.STOPPING && getRunningState() != RunningState.STOPPED)
-		{
+    {
       setRunningState(RunningState.STOPPING);
       log.trace("Stopping Transport");
 
@@ -218,10 +221,10 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 
       disconnectClient();
 
-      log.info("Transport stopped mqtt client and worker thread. Transport state set to STOPPED.");
+      log.trace("Transport stopped mqtt client and worker thread. Transport state set to STOPPED.");
     }
     setRunningState(RunningState.STOPPED);
-		}
+  }
 
   @Override
   public boolean isClusterable()
@@ -231,23 +234,23 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
 
   private void disconnectClient()
   {
-		try
-		{
+    try
+    {
       mqttClientManager.disconnectMqtt(mqttClient);
     }
     catch (Throwable e)
     { // pass
     }
     finally
-		{
-			mqttClient = null;
-		}
-	}
+    {
+      mqttClient = null;
+    }
+  }
 
-	@Override
+  @Override
   public void afterPropertiesSet()
   {
-    log.info("Setting Prpoerties, resetting client, and updating state");
+    log.trace("Setting Prpoerties, resetting client, and updating state");
     super.afterPropertiesSet();
     disconnectClient();
     setErrorMessage("");
@@ -256,8 +259,8 @@ public class MqttInboundTransport extends InboundTransportBase implements Runnab
       setRunningState(RunningState.STARTED);
     }
     else
-	{
+    {
       setRunningState(RunningState.STOPPED);
     }
-	}
+  }
 }
