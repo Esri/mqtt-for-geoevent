@@ -32,15 +32,15 @@ import com.esri.ges.transport.util.XmlTransportDefinition;
 public class MqttOutboundTransportService extends TransportServiceBase
 {
 
-	public MqttOutboundTransportService()
-	{
-		definition = new XmlTransportDefinition(getResourceAsStream("mqtt-outbound-transport-definition.xml"));
-	}
+  public MqttOutboundTransportService()
+  {
+    definition = new XmlTransportDefinition(getResourceAsStream("mqtt-outbound-transport-definition.xml"));
+  }
 
-	@Override
-	public Transport createTransport() throws ComponentException
-	{
-		return new MqttOutboundTransport(definition);
-	}
+  @Override
+  public Transport createTransport() throws ComponentException
+  {
+    return new MqttOutboundTransport(definition);
+  }
 
 }

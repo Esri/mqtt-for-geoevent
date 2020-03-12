@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0" >
-	<bean id="mqttInboundTransportServiceBean" class="com.esri.geoevent.transport.mqtt.MqttInboundTransportService" activation="eager">
-		<property name="bundleContext" ref="blueprintBundleContext"/>
-	</bean>
-	<service id="mqttInboundTransportService" ref="mqttInboundTransportServiceBean" interface="com.esri.ges.transport.TransportService"/>
-	<bean id="mqttOutboundTransportServiceBean" class="com.esri.geoevent.transport.mqtt.MqttOutboundTransportService" activation="eager">
-		<property name="bundleContext" ref="blueprintBundleContext"/>
-	</bean>
-	<service id="mqttOutboundTransportService" ref="mqttOutboundTransportServiceBean" interface="com.esri.ges.transport.TransportService"/>
+<blueprint xmlns="http://www.osgi.org/xmlns/blueprint/v1.0.0">
+  <bean id="mqttInboundTransportServiceBean" class="com.esri.geoevent.transport.mqtt.MqttInboundTransportService" activation="eager">
+    <property name="bundleContext" ref="blueprintBundleContext" />
+  </bean>
+  <service id="mqttInboundTransportService" ref="mqttInboundTransportServiceBean" interface="com.esri.ges.transport.TransportService" />
+  <bean id="mqttOutboundTransportServiceBean" class="com.esri.geoevent.transport.mqtt.MqttOutboundTransportService" activation="eager">
+    <property name="bundleContext" ref="blueprintBundleContext" />
+  </bean>
+  <service id="mqttOutboundTransportService" ref="mqttOutboundTransportServiceBean" interface="com.esri.ges.transport.TransportService" />
 </blueprint>

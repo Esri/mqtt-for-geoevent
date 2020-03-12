@@ -44,26 +44,26 @@ import com.esri.ges.transport.TransportDefinition;
 public class MqttOutboundTransport extends OutboundTransportBase implements GeoEventAwareTransport, Runnable
 {
 
-	private static final BundleLogger log = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
+  private static final BundleLogger log               = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
-  private final MqttClientManager   mqttClientManager      = new MqttClientManager(log);
-	private MqttClient mqttClient;
-  private ScheduledExecutorService  executor  = Executors.newSingleThreadScheduledExecutor();
-  private boolean                   isStarted = false;
+  private final MqttClientManager   mqttClientManager = new MqttClientManager(log);
+  private MqttClient                mqttClient;
+  private ScheduledExecutorService  executor          = Executors.newSingleThreadScheduledExecutor();
+  private boolean                   isStarted         = false;
 
-	public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
-	{
-		super(definition);
-	}
+  public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
+  {
+    super(definition);
+  }
 
-	@Override
-	public void start() throws RunningException
-	{
+  @Override
+  public void start() throws RunningException
+  {
     isStarted = true;
     if (getRunningState() == RunningState.STOPPED)
-			{
-				log.trace("Starting MQTT Outbound Transport");
-			setRunningState(RunningState.STARTING);
+    {
+      log.trace("Starting MQTT Outbound Transport");
+      setRunningState(RunningState.STARTING);
 
       try
       {
@@ -72,48 +72,47 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
         mqttClient.connect();
 
         setRunningState(RunningState.STARTED);
-        log.info("Transport started mqtt client. Transport state set to STARTED.");
+        log.trace("Transport started mqtt client. Transport state set to STARTED.");
       }
       catch (Exception e)
-			{
+      {
         String errormsg = log.translate("{0} {1}", log.translate("INIT_ERROR", "outbound"), e.getMessage());
         log.error(errormsg, e);
         setRunningState(RunningState.ERROR);
         setErrorMessage(errormsg);
       }
-			}
+    }
     else
-		{
-      log.info("Cannot start transport: Not in STOPPED state.");
-		}
-	}
+    {
+      log.trace("Cannot start transport: Not in STOPPED state.");
+    }
+  }
 
-	@Override
-	public void receive(ByteBuffer buffer, String channelId)
-	{
-		receive(buffer, channelId, null);
-	}
+  @Override
+  public void receive(ByteBuffer buffer, String channelId)
+  {
+    receive(buffer, channelId, null);
+  }
 
-	@Override
-	public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent)
-	{
-    log.trace("receive {0}: {1}", channelID, geoEvent);
-
+  @Override
+  public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent)
+  {
     String topic = mqttClientManager.getTopic();
-		if (geoEvent != null && topic.contains("$"))
-		{
+
+    if (geoEvent != null && topic.contains("$"))
+    {
       log.trace("received geoEvent, creating output topic from field values using template {0}", topic);
-			// Do field value substitution like "${field1}/${field2}"
-			topic = geoEvent.formatString(topic);
-		}
-		
-    log.trace("Publishing outgoing bytes to topic {0}", topic);
+      // Do field value substitution like "${field1}/${field2}"
+      topic = geoEvent.formatString(topic);
+    }
+    log.debug("Publishing outgoing bytes to topic {0}: {1}", topic, geoEvent);
+
     if (mqttClientManager.isTopicValid(topic))
-		{
-			try
-			{
-				byte[] b = new byte[buffer.remaining()];
-				buffer.get(b);
+    {
+      try
+      {
+        byte[] b = new byte[buffer.remaining()];
+        buffer.get(b);
 
         if (mqttClient == null || !mqttClient.isConnected())
         {
@@ -126,11 +125,11 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
         setErrorMessage(null);
       }
       catch (Exception e)
-			{
+      {
         try
         {
           String errormsg = log.translate("ERROR_PUBLISHING", e.getMessage());
-          log.error(errormsg, e);
+          log.debug(errormsg, e);
           setErrorMessage(errormsg);
           mqttClientManager.disconnectMqtt(mqttClient);
           setRunningState(RunningState.ERROR);
@@ -139,44 +138,44 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
         finally
         {
           mqttClient = null;
-			}
+        }
       }
     }
     else
-		{
-      log.warn("GeoEvent Topic {0} is not valid, GeoEvent not published to MQTT output: {1}", topic, geoEvent);
-		}
-	}
+    {
+      log.debug("GeoEvent Topic {0} is not valid, GeoEvent not published to MQTT output: {1}", topic, geoEvent);
+    }
+  }
 
-	@Override
-	public synchronized void stop()
-	{
+  @Override
+  public synchronized void stop()
+  {
     isStarted = false;
     log.trace("Stopping Transport");
     if (getRunningState() != RunningState.STOPPING && getRunningState() != RunningState.STOPPED)
-		{
+    {
       setRunningState(RunningState.STOPPING);
 
       disconnectClient();
 
-      log.info("Transport stopped mqtt client. Transport state set to STOPPED.");
+      log.trace("Transport stopped mqtt client. Transport state set to STOPPED.");
     }
     setRunningState(RunningState.STOPPED);
-		}
+  }
 
   private void disconnectClient()
   {
-		try
-		{
+    try
+    {
       mqttClientManager.disconnectMqtt(mqttClient);
     }
     catch (Throwable e)
     { // pass
     }
     finally
-		{
-			mqttClient = null;
-		}
+    {
+      mqttClient = null;
+    }
   }
 
   @Override
@@ -196,18 +195,18 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
   @Override
   public void afterPropertiesSet()
   {
-    log.info("Setting Prpoerties, resetting client, and updating state");
+    log.trace("Setting Prpoerties, resetting client, and updating state");
     super.afterPropertiesSet();
     disconnectClient();
     setErrorMessage("");
     if (isStarted)
-		{
+    {
       setRunningState(RunningState.STARTED);
-		}
+    }
     else
     {
-		setRunningState(RunningState.STOPPED);
-	}
+      setRunningState(RunningState.STOPPED);
+    }
   }
 
 }
