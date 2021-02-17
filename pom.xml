@@ -10,7 +10,7 @@
   <url>http://www.esri.com</url>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.bundle.plugin.version>4.0.0</maven.bundle.plugin.version>
+    <maven.bundle.plugin.version>4.2.1</maven.bundle.plugin.version>
     <junit.version>4.8.1</junit.version>
     <project.release>2</project.release>
   </properties>
