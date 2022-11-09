@@ -24,32 +24,28 @@
 
 package com.esri.geoevent.transport.mqtt;
 
-import java.nio.ByteBuffer;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-
-import org.eclipse.paho.client.mqttv3.MqttClient;
-
 import com.esri.ges.core.component.ComponentException;
-import com.esri.ges.core.component.RunningException;
 import com.esri.ges.core.component.RunningState;
 import com.esri.ges.core.geoevent.GeoEvent;
+import com.esri.ges.core.validation.ValidationException;
 import com.esri.ges.framework.i18n.BundleLogger;
 import com.esri.ges.framework.i18n.BundleLoggerFactory;
 import com.esri.ges.transport.GeoEventAwareTransport;
 import com.esri.ges.transport.OutboundTransportBase;
 import com.esri.ges.transport.TransportDefinition;
+import java.nio.ByteBuffer;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
-public class MqttOutboundTransport extends OutboundTransportBase implements GeoEventAwareTransport, Runnable
+public class MqttOutboundTransport extends OutboundTransportBase implements MqttTransport, GeoEventAwareTransport, Runnable
 {
+  private static final BundleLogger LOGGER = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
 
-  private static final BundleLogger log               = BundleLoggerFactory.getLogger(MqttOutboundTransport.class);
+  private MqttTransportConfig config;
 
-  private final MqttClientManager   mqttClientManager = new MqttClientManager(log);
-  private MqttClient                mqttClient;
-  private ScheduledExecutorService  executor          = Executors.newSingleThreadScheduledExecutor();
-  private boolean                   isStarted         = false;
+  private MqttClientManager mqttClientManager;
+  private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
   public MqttOutboundTransport(TransportDefinition definition) throws ComponentException
   {
@@ -57,34 +53,35 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
   }
 
   @Override
-  public void start() throws RunningException
+  public void start()
   {
-    isStarted = true;
-    if (getRunningState() == RunningState.STOPPED)
-    {
-      log.trace("Starting MQTT Outbound Transport");
-      setRunningState(RunningState.STARTING);
-
-      try
-      {
-        mqttClientManager.applyProperties(this);
-        mqttClient = mqttClientManager.createMqttClient();
-        mqttClient.connect();
-
-        setRunningState(RunningState.STARTED);
-        log.trace("Transport started mqtt client. Transport state set to STARTED.");
-      }
-      catch (Exception e)
-      {
-        String errormsg = log.translate("{0} {1}", log.translate("INIT_ERROR", "outbound"), e.getMessage());
-        log.error(errormsg, e);
-        setRunningState(RunningState.ERROR);
-        setErrorMessage(errormsg);
-      }
-    }
-    else
-    {
-      log.trace("Cannot start transport: Not in STOPPED state.");
+    switch (getRunningState()) {
+      case STARTED:
+      case STARTING:
+        break;
+      case STOPPED:
+      case STOPPING:
+      case ERROR:
+        LOGGER.trace("Starting MQTT outbound transport...");
+        setRunningState(RunningState.STARTING);
+        try
+        {
+          mqttClientManager = new MqttClientManager(config, LOGGER);
+          mqttClientManager.connect();
+          setRunningState(RunningState.STARTED);
+          LOGGER.trace("Transport started mqtt client. Transport state set to STARTED.");
+        }
+        catch (Exception e)
+        {
+          setRunningState(RunningState.ERROR);
+          disconnectClient();
+          // report an error
+          String errorMsg = LOGGER.translate("{0} {1}", LOGGER.translate("INIT_ERROR", "outbound"), e.getMessage());
+          LOGGER.error(errorMsg, e);
+          setErrorMessage(errorMsg);
+        }
+      default:
+        LOGGER.trace("Cannot start transport: Not in STOPPED state.");
     }
   }
 
@@ -97,84 +94,36 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
   @Override
   public void receive(ByteBuffer buffer, String channelID, GeoEvent geoEvent)
   {
-    String topic = mqttClientManager.getTopic();
-
-    if (geoEvent != null && topic.contains("$"))
+    byte[] b = new byte[buffer.remaining()];
+    buffer.get(b);
+    try
     {
-      log.trace("received geoEvent, creating output topic from field values using template {0}", topic);
-      // Do field value substitution like "${field1}/${field2}"
-      topic = geoEvent.formatString(topic);
-    }
-    log.debug("Publishing outgoing bytes to topic {0}: {1}", topic, geoEvent);
-
-    if (mqttClientManager.isTopicValid(topic))
-    {
-      try
-      {
-        byte[] b = new byte[buffer.remaining()];
-        buffer.get(b);
-
-        if (mqttClient == null || !mqttClient.isConnected())
-        {
-          mqttClientManager.disconnectMqtt(mqttClient);
-          mqttClientManager.applyProperties(this);
-          mqttClient = mqttClientManager.createMqttClient();
-          mqttClient.connect();
-        }
-        mqttClient.publish(topic, b, mqttClientManager.getQos(), mqttClientManager.isRetain());
-        setErrorMessage(null);
-      }
-      catch (Exception e)
-      {
-        try
-        {
-          String errormsg = log.translate("ERROR_PUBLISHING", e.getMessage());
-          log.debug(errormsg, e);
-          setErrorMessage(errormsg);
-          mqttClientManager.disconnectMqtt(mqttClient);
-          setRunningState(RunningState.ERROR);
-          executor.schedule(this, 3, TimeUnit.SECONDS);
-        }
-        finally
-        {
-          mqttClient = null;
-        }
-      }
-    }
-    else
-    {
-      log.debug("GeoEvent Topic {0} is not valid, GeoEvent not published to MQTT output: {1}", topic, geoEvent);
+      mqttClientManager.publish(b, geoEvent);
+      setErrorMessage(null);
+    } catch (Exception e) {
+      String errorMsg = LOGGER.translate("ERROR_PUBLISHING", e.getMessage());
+      LOGGER.debug(errorMsg, e);
+      setErrorMessage(errorMsg);
+      setRunningState(RunningState.ERROR);
+      executor.schedule(this, 3, TimeUnit.SECONDS);
     }
   }
 
   @Override
   public synchronized void stop()
   {
-    isStarted = false;
-    log.trace("Stopping Transport");
-    if (getRunningState() != RunningState.STOPPING && getRunningState() != RunningState.STOPPED)
-    {
-      setRunningState(RunningState.STOPPING);
-
-      disconnectClient();
-
-      log.trace("Transport stopped mqtt client. Transport state set to STOPPED.");
-    }
-    setRunningState(RunningState.STOPPED);
-  }
-
-  private void disconnectClient()
-  {
-    try
-    {
-      mqttClientManager.disconnectMqtt(mqttClient);
-    }
-    catch (Throwable e)
-    { // pass
-    }
-    finally
-    {
-      mqttClient = null;
+    LOGGER.trace("Stopping Transport");
+    switch (getRunningState()) {
+      case STOPPED:
+      case STOPPING:
+      case ERROR:
+        break;
+      default:
+        setRunningState(RunningState.STOPPING);
+        LOGGER.trace("Stopping MQTT outbound transport...");
+        disconnectClient();
+        setRunningState(RunningState.STOPPED);
+        LOGGER.trace("MQTT outbound transport stopped mqtt client. Transport state is set to STOPPED.");
     }
   }
 
@@ -189,24 +138,57 @@ public class MqttOutboundTransport extends OutboundTransportBase implements GeoE
 
   /*
    * (non-Javadoc)
-   * 
+   *
    * @see com.esri.ges.transport.TransportBase#afterPropertiesSet()
    */
   @Override
   public void afterPropertiesSet()
   {
-    log.trace("Setting Prpoerties, resetting client, and updating state");
     super.afterPropertiesSet();
-    disconnectClient();
-    setErrorMessage("");
-    if (isStarted)
-    {
-      setRunningState(RunningState.STARTED);
-    }
-    else
-    {
-      setRunningState(RunningState.STOPPED);
-    }
+    // time to read transport configuration
+    config = new MqttTransportConfigReader(this).readConfig();
   }
 
+  @Override public void validate() throws ValidationException
+  {
+    StringBuilder sb = new StringBuilder();
+    // validate parent classes
+    try {
+      super.validate();
+    } catch (ValidationException e) {
+      sb.append(e.getMessage()).append("\n");
+    }
+    // validate transport config next
+    if (config != null) {
+      if (config.hasErrors())
+      {
+        for (String error : config.getErrors())
+          sb.append(error).append("\n");
+      } else {
+        // test connection
+        MqttClientManager manager = new MqttClientManager(config, LOGGER);
+        try {
+          manager.connect();
+        } catch (Exception error) {
+          String errorMsg = LOGGER.translate("CONNECTION_TEST_FAILED", config.getUrl(), error.getMessage());
+          sb.append(errorMsg).append("\n");
+        }
+        manager.disconnect();
+      }
+    }
+    // report validation errors if they exist
+    if (sb.length() > 0)
+      throw new ValidationException(sb.toString());
+  }
+
+  @Override public BundleLogger getLogger()
+  {
+    return LOGGER;
+  }
+
+  private void disconnectClient()
+  {
+    if (mqttClientManager != null)
+      mqttClientManager.disconnect();
+  }
 }
