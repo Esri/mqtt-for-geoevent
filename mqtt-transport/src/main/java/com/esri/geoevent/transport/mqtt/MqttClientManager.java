@@ -51,11 +51,6 @@ public class MqttClientManager
       LOGGER.trace(this.toString());
   }
 
-  public void connect() throws MqttException
-  {
-    connect(null);
-  }
-
   public void connect(MqttCallback callback) throws MqttException
   {
     if (config.isUseCredentials())
@@ -94,12 +89,12 @@ public class MqttClientManager
     }
   }
 
-  public void ensureIsConnected() throws MqttException
+  public void ensureIsConnected(MqttCallback callback) throws MqttException
   {
     if (!isConnected())
     {
       disconnect();
-      connect();
+      connect(callback);
     }
   }
 
@@ -115,7 +110,7 @@ public class MqttClientManager
     if (isTopicValid(topicToPublish))
     {
       LOGGER.debug("Publishing outgoing bytes to topic {0}: {1}", topicToPublish, geoEvent);
-      ensureIsConnected();
+      ensureIsConnected(null); // no callback function
       mqttClient.publish(topicToPublish, b, config.getQos(), config.isRetain());
     }
     else
@@ -125,10 +120,7 @@ public class MqttClientManager
   }
 
   public void subscribe(MqttCallback callback) throws Exception {
-    // let us make sure mqtt client is disconnected
-    disconnect();
-    LOGGER.trace("Creating new MQTT client...");
-    connect(callback);
+    ensureIsConnected(callback);
     mqttClient.subscribe(config.getTopic(), config.getQos());
     LOGGER.trace("Connecting to mqtt using {}", this);
   }
@@ -141,6 +133,7 @@ public class MqttClientManager
    */
   private MqttClient createMqttClient(MqttCallback callback) throws MqttException
   {
+    LOGGER.trace("Creating new MQTT client...");
     LOGGER.debug("Creating MQTT Broker client at URL {0}", config.getUrl());
     MqttClient mqttClient = new MqttClient(config.getUrl(), MqttClient.generateClientId(), new MemoryPersistence());
     if (callback != null)

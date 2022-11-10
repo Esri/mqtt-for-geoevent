@@ -47,6 +47,31 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
   private MqttTransportConfig config;
   private MqttClientManager mqttClientManager;
   private ScheduledExecutorService executor;
+  private final MqttCallback mqttCallback = new MqttCallback()
+  {
+    @Override public void messageArrived(String topic, MqttMessage message)
+    {
+      try
+      {
+        LOGGER.debug("Message arrived on topic {0}: ( {1} )", topic, message);
+        receive(message.getPayload());
+      }
+      catch (RuntimeException e)
+      {
+        LOGGER.debug("ERROR_PUBLISHING", e);
+      }
+    }
+
+    @Override public void deliveryComplete(IMqttDeliveryToken token)
+    {
+      // not used
+    }
+
+    @Override public void connectionLost(Throwable cause)
+    {
+      LOGGER.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
+    }
+  };
 
   public MqttInboundTransport(TransportDefinition definition) throws ComponentException
   {
@@ -67,10 +92,13 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
         this.setRunningState(RunningState.STARTING);
         try
         {
-          mqttClientManager = new MqttClientManager(config, LOGGER);
-          executor = Executors.newSingleThreadScheduledExecutor();
-          executor.scheduleAtFixedRate(this, 1, 3, TimeUnit.SECONDS);
-          // STARTED state is set in the thread
+          if (mqttClientManager == null)
+            mqttClientManager = new MqttClientManager(config, LOGGER);
+          if (executor == null) {
+            executor = Executors.newSingleThreadScheduledExecutor();
+            executor.scheduleAtFixedRate(this, 1, 3, TimeUnit.SECONDS);
+          }
+          // Running state STARTED is set in the thread
         } catch (Exception e) {
           setRunningState(RunningState.ERROR);
           disconnectClient();
@@ -79,53 +107,32 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
           LOGGER.error(errorMsg, e);
           setErrorMessage(errorMsg);
         }
+        break;
       default:
+        LOGGER.trace("Cannot start MQTT inbound transport: transport is unavailable.");
     }
   }
 
   @Override
   public void run()
   {
-    try
-    {
-      mqttClientManager.subscribe(new MqttCallback() {
-        @Override
-        public void messageArrived(String topic, MqttMessage message) throws Exception
+    switch (getRunningState()) {
+      case STARTED:
+      case ERROR:
+        try
         {
-          try
-          {
-            LOGGER.debug("Message arrived on topic {0}: ( {1} )", topic, message);
-            receive(message.getPayload());
-          }
-          catch (RuntimeException e)
-          {
-            LOGGER.debug("ERROR_PUBLISHING", e);
-          }
+          mqttClientManager.subscribe(mqttCallback);
+          setRunningState(RunningState.STARTED);
+        } catch (Throwable ex) {
+          setRunningState(RunningState.ERROR);
+          disconnectClient();
+          // report an error
+          String errorMsg = LOGGER.translate("UNEXPECTED_ERROR", ex.getMessage());
+          LOGGER.debug(errorMsg, ex);
+          setErrorMessage(errorMsg);
         }
-
-        @Override
-        public void deliveryComplete(IMqttDeliveryToken token)
-        {
-          // not used
-        }
-
-        @Override
-        public void connectionLost(Throwable cause)
-        {
-          LOGGER.debug("CONNECTION_LOST", cause, cause.getLocalizedMessage());
-        }
-      });
-      setRunningState(RunningState.STARTED);
-      LOGGER.trace("MQTT inbound transport has started mqtt client. Transport state is set to STARTED.");
-    }
-    catch (Throwable ex)
-    {
-      setRunningState(RunningState.ERROR);
-      disconnectClient();
-      // report an error
-      String errorMsg = LOGGER.translate("UNEXPECTED_ERROR", ex.getMessage());
-      LOGGER.debug(errorMsg, ex);
-      setErrorMessage(errorMsg);
+        break;
+      default:
     }
   }
 
@@ -159,9 +166,9 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
       }
       catch (Exception e)
       {
-        LOGGER.debug("UNEXPECTED_ERROR2", e);
-        disconnectClient();
         setRunningState(RunningState.ERROR);
+        disconnectClient();
+        LOGGER.debug("UNEXPECTED_ERROR2", e);
         setErrorMessage("Unexpected Error: " + e.getMessage());
       }
     }
@@ -172,29 +179,19 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
     switch (getRunningState()) {
       case STOPPED:
       case STOPPING:
-      case ERROR:
         break;
-      default:
+      case STARTED:
+      case STARTING:
+      case ERROR:
         setRunningState(RunningState.STOPPING);
         LOGGER.trace("Stopping MQTT inbound transport...");
-        if (executor != null)
-        {
-          try
-          {
-            executor.shutdownNow();
-            executor.awaitTermination(3, TimeUnit.SECONDS);
-          }
-          catch (Throwable e)
-          { // pass
-          }
-          finally
-          {
-            executor = null;
-          }
-        }
         disconnectClient();
+        stopExecutor();
         setRunningState(RunningState.STOPPED);
         LOGGER.trace("MQTT inbound transport has stopped mqtt client and worker thread. Transport state is set to STOPPED.");
+        break;
+      default:
+        LOGGER.trace("Cannot stop MQTT inbound transport: transport is unavailable.");
     }
   }
 
@@ -231,7 +228,7 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
         // test connection
         MqttClientManager manager = new MqttClientManager(config, LOGGER);
         try {
-          manager.connect();
+          manager.connect(null); // no callback function
         } catch (Exception error) {
           String errorMsg = LOGGER.translate("CONNECTION_TEST_FAILED", config.getUrl(), error.getMessage());
           sb.append(errorMsg).append("\n");
@@ -253,5 +250,24 @@ public class MqttInboundTransport extends InboundTransportBase implements MqttTr
   {
     if (mqttClientManager != null)
       mqttClientManager.disconnect();
+  }
+
+  private void stopExecutor() {
+    if (executor != null)
+    {
+      try
+      {
+        executor.shutdownNow();
+        executor.awaitTermination(3, TimeUnit.SECONDS);
+      }
+      catch (Throwable e)
+      {
+        // pass
+      }
+      finally
+      {
+        executor = null;
+      }
+    }
   }
 }

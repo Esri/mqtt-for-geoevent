@@ -66,13 +66,13 @@ public class MqttOutboundTransport extends OutboundTransportBase implements Mqtt
         setRunningState(RunningState.STARTING);
         try
         {
-          mqttClientManager = new MqttClientManager(config, LOGGER);
-          mqttClientManager.connect();
+          if (mqttClientManager == null)
+            mqttClientManager = new MqttClientManager(config, LOGGER);
+          if (!mqttClientManager.isConnected())
+            mqttClientManager.connect(null); // no callback function
           setRunningState(RunningState.STARTED);
           LOGGER.trace("Transport started mqtt client. Transport state set to STARTED.");
-        }
-        catch (Exception e)
-        {
+        } catch (Exception e) {
           setRunningState(RunningState.ERROR);
           disconnectClient();
           // report an error
@@ -80,8 +80,9 @@ public class MqttOutboundTransport extends OutboundTransportBase implements Mqtt
           LOGGER.error(errorMsg, e);
           setErrorMessage(errorMsg);
         }
+        break;
       default:
-        LOGGER.trace("Cannot start transport: Not in STOPPED state.");
+        LOGGER.trace("Cannot start MQTT outbound transport: transport is unavailable.");
     }
   }
 
@@ -112,18 +113,21 @@ public class MqttOutboundTransport extends OutboundTransportBase implements Mqtt
   @Override
   public synchronized void stop()
   {
-    LOGGER.trace("Stopping Transport");
     switch (getRunningState()) {
       case STOPPED:
       case STOPPING:
-      case ERROR:
         break;
-      default:
+      case STARTED:
+      case STARTING:
+      case ERROR:
         setRunningState(RunningState.STOPPING);
         LOGGER.trace("Stopping MQTT outbound transport...");
         disconnectClient();
         setRunningState(RunningState.STOPPED);
         LOGGER.trace("MQTT outbound transport stopped mqtt client. Transport state is set to STOPPED.");
+        break;
+      default:
+        LOGGER.trace("Cannot stop MQTT outbound transport: transport is unavailable.");
     }
   }
 
@@ -131,9 +135,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements Mqtt
   public void run()
   {
     if (getRunningState() == RunningState.ERROR)
-    {
       setRunningState(RunningState.STARTED);
-    }
   }
 
   /*
@@ -168,7 +170,7 @@ public class MqttOutboundTransport extends OutboundTransportBase implements Mqtt
         // test connection
         MqttClientManager manager = new MqttClientManager(config, LOGGER);
         try {
-          manager.connect();
+          manager.connect(null); // no callback function
         } catch (Exception error) {
           String errorMsg = LOGGER.translate("CONNECTION_TEST_FAILED", config.getUrl(), error.getMessage());
           sb.append(errorMsg).append("\n");
