@@ -107,7 +107,7 @@ public class MqttTransportConfig
   }
 
   public boolean hasErrors() {
-    return errors.size() > 0;
+    return errors != null && errors.size() > 0;
   }
 
   public List<String> getErrors() {

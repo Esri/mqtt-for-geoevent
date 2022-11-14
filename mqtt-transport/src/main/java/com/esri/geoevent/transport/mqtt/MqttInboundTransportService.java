@@ -31,7 +31,6 @@ import com.esri.ges.transport.util.XmlTransportDefinition;
 
 public class MqttInboundTransportService extends TransportServiceBase
 {
-
   public MqttInboundTransportService()
   {
     XmlTransportDefinition xmlAdapterDefinition = new XmlTransportDefinition(getResourceAsStream("mqtt-inbound-transport-definition.xml"));
@@ -43,5 +42,4 @@ public class MqttInboundTransportService extends TransportServiceBase
   {
     return new MqttInboundTransport(definition);
   }
-
 }

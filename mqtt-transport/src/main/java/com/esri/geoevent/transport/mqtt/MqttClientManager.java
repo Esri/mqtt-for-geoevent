@@ -98,7 +98,7 @@ public class MqttClientManager
     }
   }
 
-  public void publish(byte[] b, GeoEvent geoEvent) throws Exception
+  public void publish(byte[] bytes, GeoEvent geoEvent) throws Exception
   {
     String topicToPublish = config.getTopic();
     if (config.isTopicNameSubstituteRequired() && geoEvent != null)
@@ -111,7 +111,7 @@ public class MqttClientManager
     {
       LOGGER.debug("Publishing outgoing bytes to topic {0}: {1}", topicToPublish, geoEvent);
       ensureIsConnected(null); // no callback function
-      mqttClient.publish(topicToPublish, b, config.getQos(), config.isRetain());
+      mqttClient.publish(topicToPublish, bytes, config.getQos(), config.isRetain());
     }
     else
     {
