@@ -4,14 +4,14 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.esri.geoevent.parent</groupId>
   <artifactId>mqtt</artifactId>
-  <version>10.4.0</version>
+  <version>10.6.0</version>
   <packaging>pom</packaging>
   <name>Esri :: GeoEvent :: MQTT</name>
   <url>http://www.esri.com</url>
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.bundle.plugin.version>4.2.1</maven.bundle.plugin.version>
-    <junit.version>4.8.1</junit.version>
+    <maven.bundle.plugin.version>4.0.0</maven.bundle.plugin.version>
+    <junit.version>4.13.1</junit.version>
     <project.release>2</project.release>
   </properties>
   <modules>

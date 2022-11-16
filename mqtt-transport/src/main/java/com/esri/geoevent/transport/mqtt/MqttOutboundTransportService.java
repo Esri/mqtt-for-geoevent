@@ -31,7 +31,6 @@ import com.esri.ges.transport.util.XmlTransportDefinition;
 
 public class MqttOutboundTransportService extends TransportServiceBase
 {
-
   public MqttOutboundTransportService()
   {
     definition = new XmlTransportDefinition(getResourceAsStream("mqtt-outbound-transport-definition.xml"));
@@ -42,5 +41,4 @@ public class MqttOutboundTransportService extends TransportServiceBase
   {
     return new MqttOutboundTransport(definition);
   }
-
 }
