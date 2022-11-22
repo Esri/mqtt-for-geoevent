@@ -23,7 +23,7 @@ import java.util.regex.Pattern;
 
 public abstract class MqttTransportBase extends TransportBase implements MqttCallback, Runnable
 {
-  protected static final BundleLogger LOGGER = BundleLoggerFactory.getLogger(MqttTransportBase.class.getName(), "com.esri.ges.framework.transport.transport-api");
+  protected static final BundleLogger LOGGER = BundleLoggerFactory.getLogger(MqttTransportBase.class.getName(), "com.esri.geoevent.transport.mqtt-transport");
   private MqttTransportConfig config;
   private MqttClientManager mqttClientManager;
   private ScheduledExecutorService executor;
