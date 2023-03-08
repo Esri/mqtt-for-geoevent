@@ -17,6 +17,12 @@
       <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
       <version>1.2.5</version>
     </dependency>
+    <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on -->
+    <dependency>
+      <groupId>org.bouncycastle</groupId>
+      <artifactId>bcprov-jdk15on</artifactId>
+      <version>1.70</version>
+    </dependency>
   </dependencies>
   <build>
     <plugins>
@@ -35,6 +41,14 @@
             </Embed-Dependency>
             <Private-Package>com.esri.geoevent.transport.mqtt</Private-Package>
           </instructions>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>11</source>
+          <target>11</target>
         </configuration>
       </plugin>
     </plugins>
