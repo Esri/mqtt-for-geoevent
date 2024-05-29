@@ -19,6 +19,10 @@ public class MqttTransportConfig
   private final String url;
   private final MqttConnectOptions connectOptions;
   private final List<String> errors;
+  private final String clientId;
+  private final boolean cleanSession;
+  private final int keepAliveInterval;
+  private final boolean autoReconnect;
 
   public MqttTransportConfig(
       String host,
@@ -29,7 +33,11 @@ public class MqttTransportConfig
       String password,
       int qos,
       boolean isRetain,
-      List<String> errors)
+      List<String> errors,
+      String clientId,
+      boolean cleanSession,
+      int keepAliveInterval,
+      boolean autoReconnect)
   {
     this.host = host;
     this.port = port;
@@ -40,6 +48,10 @@ public class MqttTransportConfig
     this.password = password;
     this.qos = qos;
     this.isRetain = isRetain;
+    this.clientId = clientId;
+    this.cleanSession = cleanSession;
+    this.keepAliveInterval = keepAliveInterval;
+    this.autoReconnect = autoReconnect;
 
     // initialize Mqtt connect options
     this.connectOptions = new MqttConnectOptions();
@@ -65,7 +77,10 @@ public class MqttTransportConfig
       // initialize url for non-ssl connection
       this.url = "tcp://" + host + ":" + port;
     }
-    connectOptions.setCleanSession(true);
+
+    connectOptions.setCleanSession(cleanSession);
+    connectOptions.setKeepAliveInterval(keepAliveInterval);
+    connectOptions.setAutomaticReconnect(autoReconnect);
 
     this.errors = errors;
   }
@@ -114,9 +129,13 @@ public class MqttTransportConfig
     return errors;
   }
 
+  public String getClientId() {
+    return clientId;
+  }
+
   @Override
   public String toString()
   {
-    return "port=" + port + ", host=" + host + ", ssl=" + isUseSSL + ", topic=" + topic + ", qos=" + qos + ", username=" + username + ", password=" + password + ", retain=" + isRetain;
+    return "port=" + port + ", host=" + host + ", ssl=" + isUseSSL + ", topic=" + topic + ", qos=" + qos + ", username=" + username + ", password=" + password + ", retain=" + isRetain + ", clientId=" + clientId + ", cleanSession=" + cleanSession + ", keepAliveInterval=" + keepAliveInterval + ", autoReconnect=" + autoReconnect;
   }
 }

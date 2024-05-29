@@ -61,6 +61,7 @@ public class MqttClientManager
 
     mqttClient = createMqttClient(callback);
     mqttClient.connect(config.getConnectOptions());
+    LOGGER.info("mqttClient connected clientId=" + mqttClient.getClientId());
   }
 
   public boolean isConnected()
@@ -135,7 +136,8 @@ public class MqttClientManager
   {
     LOGGER.trace("Creating new MQTT client...");
     LOGGER.debug("Creating MQTT Broker client at URL {0}", config.getUrl());
-    MqttClient mqttClient = new MqttClient(config.getUrl(), MqttClient.generateClientId(), new MemoryPersistence());
+    /* MqttClient mqttClient = new MqttClient(config.getUrl(), MqttClient.generateClientId(), new MemoryPersistence()); */
+    MqttClient mqttClient = new MqttClient(config.getUrl(), config.getClientId(), new MemoryPersistence());
     if (callback != null)
     {
       LOGGER.trace("Setting MQTT callback to receive messages");

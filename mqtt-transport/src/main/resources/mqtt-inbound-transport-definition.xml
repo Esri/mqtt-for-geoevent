@@ -19,5 +19,14 @@
       description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_USERNAME_DESC}" propertyType="String" defaultValue="" mandatory="false" readOnly="false" />
     <propertyDefinition propertyName="password" label="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_PASSWORD_LBL}"
       description="${com.esri.geoevent.transport.mqtt-transport.TRANSPORT_IN_PASSWORD_DESC}" propertyType="Password" defaultValue="" mandatory="false" readOnly="false" />
+
+    <propertyDefinition propertyName="clientId" label="Client ID" description="Client ID"
+                        propertyType="String" defaultValue="" mandatory="true" readOnly="false" />
+    <propertyDefinition propertyName="cleanSession" label="Clean Session" description="Clean Session"
+                        propertyType="Boolean" defaultValue="false" mandatory="true" readOnly="false" />
+    <propertyDefinition propertyName="keepAliveInterval" label="Keep Alive Interval (in seconds)" description="Keep Alive Interval (in seconds)"
+                        propertyType="Integer" defaultValue="60" mandatory="true" readOnly="false" />
+    <propertyDefinition propertyName="autoReconnect" label="Auto Reconnect" description="Auto Reconnect"
+                        propertyType="Boolean" defaultValue="true" mandatory="true" readOnly="false" />
   </propertyDefinitions>
 </transport>

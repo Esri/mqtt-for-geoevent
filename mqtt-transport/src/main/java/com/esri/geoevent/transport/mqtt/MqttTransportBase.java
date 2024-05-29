@@ -239,7 +239,7 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
     }
 
     // qos is an integer from the set [0, 1, or 2]
-    int qos = 0;
+    int qos = 1;
     if (hasProperty("qos"))
     {
       String qosValue = getPropertyValueAsString("qos", errors);
@@ -257,6 +257,7 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
         }
       }
     }
+    LOGGER.info("Property value qos = " + qos);
 
     // retain is a boolean value
     boolean isRetain = false;
@@ -271,7 +272,69 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
         isRetain = Boolean.parseBoolean(retainValue);
       }
     }
-    config = new MqttTransportConfig(host, port, (topic == null) ? "": topic, isUseSSL, username, password, qos, isRetain, errors);
+
+    //clientId is a string value
+    String clientId = "";
+    if (hasProperty("clientId")) {
+      clientId = getPropertyValueAsString("clientId", errors).trim();
+    }
+    if (StringUtils.isEmpty(clientId))
+    {
+      // mandatory property value is null or empty -> report this error
+      errors.add("Property value clientId cannot be NULL or EMPTY.");
+    }
+    LOGGER.info("Property value clientId = " + clientId);
+
+    // cleanSession is a boolean value
+    boolean cleanSession = false;
+    if (hasProperty("cleanSession"))
+    {
+      String cleanSessionValue = getPropertyValueAsString("cleanSession", errors);
+      if (StringUtils.isEmpty(cleanSessionValue))
+      {
+        // mandatory property value is null or empty -> report this error
+        errors.add("Property value cleanSession cannot be NULL or EMPTY.");
+      } else {
+        cleanSession = Boolean.parseBoolean(cleanSessionValue);
+      }
+    }
+    LOGGER.info("Property value cleanSession = " + cleanSession);
+
+    // keepAliveInterval is an integer
+    int keepAliveInterval = 60;
+    if (hasProperty("keepAliveInterval")) {
+      String keepAliveIntervalValue = getPropertyValueAsString("keepAliveInterval", errors);
+      if (StringUtils.isEmpty(keepAliveIntervalValue)) {
+        // mandatory property value is null or empty -> report this error
+        errors.add("Property value keepAliveInterval cannot be NULL or EMPTY.");
+      } else {
+        try {
+          keepAliveInterval = Integer.parseInt(keepAliveIntervalValue);
+          if (keepAliveInterval < 0)
+            errors.add("Property value keepAliveInterval must be >= 0.");
+        } catch (NumberFormatException error) {
+          errors.add("Property value keepAliveInterval is not valid.");
+        }
+      }
+    }
+    LOGGER.info("Property value keepAliveInterval = " + keepAliveInterval);
+
+    // autoReconnect is a boolean value
+    boolean autoReconnect = true;
+    if (hasProperty("autoReconnect"))
+    {
+      String autoReconnectValue = getPropertyValueAsString("autoReconnect", errors);
+      if (StringUtils.isEmpty(autoReconnectValue))
+      {
+        // mandatory property value is null or empty -> report this error
+        errors.add("Property value autoReconnect cannot be NULL or EMPTY.");
+      } else {
+        autoReconnect = Boolean.parseBoolean(autoReconnectValue);
+      }
+    }
+    LOGGER.info("Property value autoReconnect = " + autoReconnect);
+
+    config = new MqttTransportConfig(host, port, (topic == null) ? "": topic, isUseSSL, username, password, qos, isRetain, errors, clientId, cleanSession, keepAliveInterval, autoReconnect);
   }
 
   private void startTransport()
