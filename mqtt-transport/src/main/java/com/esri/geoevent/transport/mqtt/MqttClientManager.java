@@ -122,7 +122,7 @@ public class MqttClientManager
   public void subscribe(MqttCallback callback) throws Exception {
     ensureIsConnected(callback);
     mqttClient.subscribe(config.getTopic(), config.getQos());
-    LOGGER.trace("Connecting to mqtt using {}", this);
+    LOGGER.trace("Connecting to mqtt using {0}", this);
   }
 
   /**
@@ -135,7 +135,7 @@ public class MqttClientManager
   {
     LOGGER.trace("Creating new MQTT client...");
     LOGGER.debug("Creating MQTT Broker client at URL {0}", config.getUrl());
-    MqttClient mqttClient = new MqttClient(config.getUrl(), MqttClient.generateClientId(), new MemoryPersistence());
+    MqttClient mqttClient = new MqttClient(config.getUrl(), config.getClientId(), new MemoryPersistence());
     if (callback != null)
     {
       LOGGER.trace("Setting MQTT callback to receive messages");

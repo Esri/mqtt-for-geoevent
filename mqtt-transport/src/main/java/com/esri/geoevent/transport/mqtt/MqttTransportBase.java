@@ -271,7 +271,7 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
         isRetain = Boolean.parseBoolean(retainValue);
       }
     }
-    config = new MqttTransportConfig(host, port, (topic == null) ? "": topic, isUseSSL, username, password, qos, isRetain, errors);
+    config = new MqttTransportConfig(host, port, (topic == null) ? "" : topic, isUseSSL, username, password, clientId, qos, isRetain, errors);
   }
 
   private void startTransport()
