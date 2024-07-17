@@ -224,6 +224,8 @@ public abstract class MqttTransportBase extends TransportBase implements MqttCal
     String username = hasProperty("username") ? getPropertyValueAsString("username", errors) : "";
     username = (username == null) ? "" : username;
 
+    String clientId = hasProperty("clientId") ? getPropertyValueAsString("clientId", errors) : null;
+
     // Get the password as a DecryptedValue
     String password = "";
     if (hasProperty("password") && StringUtils.isNotEmpty(getPropertyValueAsString("password", errors)))

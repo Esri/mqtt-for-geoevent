@@ -24,6 +24,8 @@
 
 package com.esri.geoevent.transport.mqtt;
 
+import java.nio.Buffer;
+
 import com.esri.ges.core.component.ComponentException;
 import com.esri.ges.messaging.ByteListener;
 import com.esri.ges.transport.InboundTransport;
@@ -80,7 +82,7 @@ public class MqttInboundTransport extends MqttTransportBase implements InboundTr
         try
         {
           bb.put(newBytes);
-          bb.flip();
+          ((Buffer) bb).flip();
           byteListener.receive(bb, "");
           bb.clear();
 
