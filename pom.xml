@@ -40,7 +40,6 @@
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit.version}</version>
-      <scope>test</scope>
     </dependency>
       <dependency>
         <groupId>org.eclipse.paho</groupId>
@@ -51,7 +50,6 @@
         <groupId>org.bouncycastle</groupId>
         <artifactId>bcprov-jdk15on</artifactId>
         <version>${org.bouncycastle}</version>
-        <scope>test</scope>
       </dependency>
 
       <!--
