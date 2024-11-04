@@ -4,33 +4,89 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.esri.geoevent.parent</groupId>
   <artifactId>mqtt</artifactId>
-  <version>10.6.0</version>
+  <version>${revision}</version>
   <packaging>pom</packaging>
   <name>Esri :: GeoEvent :: MQTT</name>
   <url>http://www.esri.com</url>
   <properties>
+    <contact.address>geoevent@esri.com</contact.address>
+
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.build.propertiesEncoding>ISO-8859-1</project.build.propertiesEncoding>
+
     <maven.bundle.plugin.version>5.1.8</maven.bundle.plugin.version>
-    <junit.version>4.13.1</junit.version>
+    <maven.resources.plugin.version>3.2.0</maven.resources.plugin.version>
+    <maven.compiler.plugin.version>3.8.1</maven.compiler.plugin.version>
+    <junit.version>4.13.2</junit.version>
+    <org.bouncycastle>1.78.1</org.bouncycastle>
+    <org.eclipse.paho.version>1.2.5</org.eclipse.paho.version>
+    <org.apache.logging.log4j.version>2.17.1</org.apache.logging.log4j.version>
+    <com.conversantmedia.version>1.2.21</com.conversantmedia.version>
+
+    <revision>10.6.0</revision>
     <project.release>3</project.release>
   </properties>
   <modules>
     <module>mqtt-transport</module>
   </modules>
+  <dependencyManagement>
   <dependencies>
     <dependency>
       <groupId>com.esri.geoevent.sdk</groupId>
       <artifactId>geoevent-sdk</artifactId>
       <version>${project.version}</version>
-      <scope>provided</scope>
     </dependency>
     <dependency>
       <groupId>junit</groupId>
       <artifactId>junit</artifactId>
       <version>${junit.version}</version>
-      <scope>test</scope>
     </dependency>
+      <dependency>
+        <groupId>org.eclipse.paho</groupId>
+        <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
+        <version>${org.eclipse.paho.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.bouncycastle</groupId>
+        <artifactId>bcprov-jdk15to18</artifactId>
+        <version>${org.bouncycastle}</version>
+      </dependency>
+
+      <!--
+      https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-core -->
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-core</artifactId>
+        <version>2.17.1</version>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/org.apache.logging.log4j/log4j-api -->
+      <dependency>
+        <groupId>org.apache.logging.log4j</groupId>
+        <artifactId>log4j-api</artifactId>
+        <version>2.17.1</version>
+      </dependency>
+
+
+      <!-- https://mvnrepository.com/artifact/com.conversantmedia/disruptor -->
+      <dependency>
+        <groupId>com.conversantmedia</groupId>
+        <artifactId>disruptor</artifactId>
+        <version>1.2.21</version>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/com.lmax/disruptor -->
+      <dependency>
+        <groupId>com.lmax</groupId>
+        <artifactId>disruptor</artifactId>
+        <version>4.0.0</version>
+      </dependency>
+      <!-- https://mvnrepository.com/artifact/org.apache.commons/commons-csv -->
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-csv</artifactId>
+        <version>1.10.0</version>
+      </dependency>
   </dependencies>
+  </dependencyManagement>
   <build>
     <resources>
       <resource>
@@ -41,14 +97,31 @@
     <pluginManagement>
       <plugins>
         <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>${maven.resources.plugin.version}</version>
+          <configuration>
+            <propertiesEncoding>${project.build.propertiesEncoding}</propertiesEncoding>
+          </configuration>
+        </plugin>
+        <plugin>
           <groupId>org.apache.felix</groupId>
           <artifactId>maven-bundle-plugin</artifactId>
           <extensions>true</extensions>
           <version>${maven.bundle.plugin.version}</version>
+          <configuration>
+            <finalName>${project.artifactId}-${project.version}</finalName>
+            <instructions>
+              <AGES-Domain>${project.groupId}</AGES-Domain>
+              <Bundle-ContactAddress>${contact.address}</Bundle-ContactAddress>
+              <Export-Package />
+            </instructions>
+          </configuration>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven.compiler.plugin.version}</version>
           <configuration>
             <source>1.8</source>
             <target>1.8</target>

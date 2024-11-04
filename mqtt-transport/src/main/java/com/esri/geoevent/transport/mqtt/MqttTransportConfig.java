@@ -1,6 +1,7 @@
 package com.esri.geoevent.transport.mqtt;
 
 import org.apache.commons.lang3.StringUtils;
+import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttConnectOptions;
 import java.util.List;
 
@@ -13,6 +14,7 @@ public class MqttTransportConfig
   private final boolean isUseSSL;
   private final String username;
   private final String password;
+  private final String clientId;
   private final boolean isUseCredentials;
   private final int qos;
   private final boolean isRetain;
@@ -27,6 +29,7 @@ public class MqttTransportConfig
       boolean isUseSSL,
       String username,
       String password,
+      String clientId,
       int qos,
       boolean isRetain,
       List<String> errors)
@@ -38,6 +41,7 @@ public class MqttTransportConfig
     this.isTopicNameSubstituteRequired = topic.contains("$");
     this.username = username;
     this.password = password;
+    this.clientId = clientId;
     this.qos = qos;
     this.isRetain = isRetain;
 
@@ -104,6 +108,14 @@ public class MqttTransportConfig
 
   public String getUserName() {
     return username;
+  }
+
+  public String getClientId() {
+    String resultString = clientId; 
+    if(clientId == null) {
+      resultString = MqttClient.generateClientId(); 
+    }
+    return resultString;
   }
 
   public boolean hasErrors() {

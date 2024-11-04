@@ -5,7 +5,7 @@
   <parent>
     <groupId>com.esri.geoevent.parent</groupId>
     <artifactId>mqtt</artifactId>
-    <version>10.6.0</version>
+    <version>${revision}</version>
   </parent>
   <groupId>com.esri.geoevent.transport</groupId>
   <artifactId>mqtt-transport</artifactId>
@@ -13,29 +13,62 @@
   <packaging>bundle</packaging>
   <dependencies>
     <dependency>
+      <groupId>com.esri.geoevent.sdk</groupId>
+      <artifactId>geoevent-sdk</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>junit</groupId>
+      <artifactId>junit</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
       <groupId>org.eclipse.paho</groupId>
       <artifactId>org.eclipse.paho.client.mqttv3</artifactId>
-      <version>1.2.5</version>
     </dependency>
-    <!-- https://mvnrepository.com/artifact/org.bouncycastle/bcprov-jdk15on -->
+
     <dependency>
       <groupId>org.bouncycastle</groupId>
-      <artifactId>bcprov-jdk15on</artifactId>
-      <version>1.70</version>
+      <artifactId>bcprov-jdk15to18</artifactId>
+      <scope>test</scope>
     </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.logging.log4j</groupId>
+      <artifactId>log4j-api</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.conversantmedia</groupId>
+      <artifactId>disruptor</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>com.lmax</groupId>
+      <artifactId>disruptor</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-csv</artifactId>
+    </dependency>
+
   </dependencies>
   <build>
     <plugins>
       <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-resources-plugin</artifactId>
+      </plugin>
+      <plugin>
         <groupId>org.apache.felix</groupId>
         <artifactId>maven-bundle-plugin</artifactId>
-        <extensions>true</extensions>
         <configuration>
           <instructions>
-            <Bundle-SymbolicName>${project.groupId}.${project.artifactId}</Bundle-SymbolicName>
-            <Bundle-ContactAddress>${contact.address}</Bundle-ContactAddress>
-            <Bundle-Version>${project.version}</Bundle-Version>
-            <Export-Package />
             <Import-Package>!com.ibm.mqttdirect.modules.local.bindings;*</Import-Package>
             <Embed-Dependency> *;scope=compile|runtime;inline=true 
             </Embed-Dependency>
@@ -46,10 +79,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
-        <configuration>
-          <source>11</source>
-          <target>11</target>
-        </configuration>
       </plugin>
     </plugins>
   </build>
